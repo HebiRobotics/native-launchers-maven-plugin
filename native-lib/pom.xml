@@ -33,7 +33,7 @@
         <profile>
             <id>native</id>
             <properties>
-                <app.mainClass>us.hebi.demos.zig.Main</app.mainClass>
+                <app.mainClass>us.hebi.demos.zig.EntryPoints</app.mainClass>
                 <app.name>native-lib</app.name>
                 <app.version>${project.version}</app.version>
                 <app.os><!--profiles--></app.os>
@@ -73,17 +73,6 @@
                         </configuration>
                     </plugin>
 
-                    <plugin>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <version>3.8.1</version>
-                        <configuration>
-                            <compilerArgs>
-                                <arg>-h</arg>
-                                <arg>${project.build.directory}/generated-include</arg>
-                            </compilerArgs>
-                        </configuration>
-                    </plugin>
-
                     <!-- zig native wrappers -->
                     <plugin>
                         <groupId>io.github.nevgeniev.zig</groupId>
@@ -97,6 +86,7 @@
                                     <packageName>ne.zig.demo.amd64.linux</packageName>
                                 </target>
                             </targets>
+                            <buildDir>${project.build.directory}/native/${app.os-arch}</buildDir>
                         </configuration>
                         <executions>
                             <execution>

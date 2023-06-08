@@ -17,6 +17,35 @@ pub fn build(b: *Builder) void {
     exe.setBuildMode(mode);
     exe.install();
 
+    const cflags = &[_][]const u8{
+        "--std=c99",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    };
+
+    const helloWorldWrapper = b.addExecutable("main_wrapper", null);
+    helloWorldWrapper.setTarget(target);
+    helloWorldWrapper.setBuildMode(mode);
+    helloWorldWrapper.addCSourceFile("src/main/zig/main_wrapper.c", cflags);
+    helloWorldWrapper.linkLibC();
+    helloWorldWrapper.strip = true;
+    helloWorldWrapper.addIncludeDir("target/native/windows-x86_64");
+    helloWorldWrapper.addLibPath("target/native/windows-x86_64");
+    helloWorldWrapper.linkSystemLibraryName("native-lib");
+    helloWorldWrapper.install();
+
+    const printDirWrapper = b.addExecutable("print_dir", null);
+    printDirWrapper.setTarget(target);
+    printDirWrapper.setBuildMode(mode);
+    printDirWrapper.addCSourceFile("src/main/zig/print_directory.c", cflags);
+    printDirWrapper.linkLibC();
+    printDirWrapper.strip = true;
+    printDirWrapper.addIncludeDir("target/native/windows-x86_64");
+    printDirWrapper.addLibPath("target/native/windows-x86_64");
+    printDirWrapper.linkSystemLibraryName("native-lib");
+    printDirWrapper.install();
+
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
