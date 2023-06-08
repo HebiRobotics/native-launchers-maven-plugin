@@ -15,6 +15,9 @@
     <properties>
         <graalvm.version>22.3.2</graalvm.version>
         <graalvm.tools.version>0.9.21</graalvm.tools.version>
+        <graalvm.skip>false</graalvm.skip>
+        <zig.version>0.8.0</zig.version>
+        <zig.plugin.version>0.2.1</zig.plugin.version>
     </properties>
 
     <dependencies>
@@ -37,6 +40,7 @@
                 <app.arch>${os.arch}</app.arch>
                 <app.os-arch>${app.os}-${app.arch}</app.os-arch>
                 <app.imageName>${app.name}</app.imageName>
+                <zig.platform>${app.arch}-${app.os}-gnu</zig.platform> <!-- TODO: macos has no gnu suffix? -->
             </properties>
             <build>
                 <plugins>
@@ -59,7 +63,7 @@
                         <configuration>
                             <mainClass>${app.mainClass}</mainClass>
                             <imageName>${app.imageName}</imageName>
-                            <skip>false</skip>
+                            <skip>${graalvm.skip}</skip>
                             <skipNativeTests>true</skipNativeTests>
                             <useArgFile>false</useArgFile>
                             <fallback>false</fallback>
@@ -67,6 +71,42 @@
                             <sharedLibrary>true</sharedLibrary>
                             <outputDirectory>${project.build.directory}/native/${app.os-arch}</outputDirectory>
                         </configuration>
+                    </plugin>
+
+                    <plugin>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.8.1</version>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>-h</arg>
+                                <arg>${project.build.directory}/generated-include</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+
+                    <!-- zig native wrappers -->
+                    <plugin>
+                        <groupId>io.github.nevgeniev.zig</groupId>
+                        <artifactId>zig-maven-plugin</artifactId>
+                        <version>${zig.plugin.version}</version>
+                        <configuration>
+                            <zigVersion>${zig.version}</zigVersion>
+                            <targets>
+                                <target> <!-- the graalvm image only exists for the current platform  -->
+                                    <platform>${zig.platform}</platform>
+                                    <packageName>ne.zig.demo.amd64.linux</packageName>
+                                </target>
+                            </targets>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>zig-build</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
 
                     <!-- create property file w/ build info -->
@@ -113,7 +153,7 @@
                 </os>
             </activation>
             <properties>
-                <app.os>macOS</app.os>
+                <app.os>macos</app.os>
             </properties>
         </profile>
         <profile>
