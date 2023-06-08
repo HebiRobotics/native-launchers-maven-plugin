@@ -12,4 +12,158 @@
 
     <artifactId>native-lib</artifactId>
 
+    <properties>
+        <graalvm.tools.version>0.9.21</graalvm.tools.version>
+    </properties>
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <properties>
+                <app.mainClass>us.hebi.demos.zig.Main</app.mainClass>
+                <app.name>native-lib</app.name>
+                <app.revision>-SNAPSHOT</app.revision>
+                <app.version>0.3${app.revision}</app.version>
+                <app.os><!--profiles--></app.os>
+                <app.arch>${os.arch}</app.arch>
+                <app.os-arch>${app.os}-${app.arch}</app.os-arch>
+                <app.staticArg>--static</app.staticArg>
+                <app.imageName>${app.name}-${app.version}-${app.os-arch}</app.imageName>
+            </properties>
+            <build>
+                <plugins>
+
+                    <!-- create property file for Conveyor -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.1.0</version>
+                        <executions>
+                            <execution>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>write-active-profile-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <outputFile>
+                                        ${project.build.outputDirectory}/build.properties
+                                    </outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- create a version file -->
+                    <plugin>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.0.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <configuration>
+                                    <target>
+                                        <echo file="${project.build.directory}/${app.name}.latest">
+                                            ${app.version}
+                                        </echo>
+                                    </target>
+                                </configuration>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- compile native -->
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>${graalvm.tools.version}</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <mainClass>${app.mainClass}</mainClass>
+                            <imageName>${app.imageName}</imageName>
+                            <skip>false</skip>
+                            <skipNativeTests>true</skipNativeTests>
+                            <useArgFile>false</useArgFile>
+                            <fallback>false</fallback>
+                            <verbose>true</verbose>
+                            <buildArgs>
+                                <arg>${app.staticArg}</arg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- platform activation -->
+        <profile>
+            <id>platform-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <app.os>windows</app.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>platform-osx</id>
+            <activation>
+                <os>
+                    <name>mac os x</name>
+                </os>
+            </activation>
+            <properties>
+                <app.os>macOS</app.os>
+                <app.staticArg>--verbose</app.staticArg> <!-- unsupported on osx -->
+            </properties>
+        </profile>
+        <profile>
+            <id>platform-linux</id>
+            <activation>
+                <os>
+                    <name>linux</name>
+                </os>
+            </activation>
+            <properties>
+                <app.os>linux</app.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>arch-amd64</id>
+            <activation>
+                <os>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <properties>
+                <app.arch>x86_64</app.arch> <!-- libstdc++-static packages are missing on RPi? -->
+            </properties>
+        </profile>
+        <profile>
+            <id>arch-aarch64</id>
+            <activation>
+                <os>
+                    <name>linux</name>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <app.staticArg>--verbose</app.staticArg> <!-- libstdc++-static packages are missing on RPi? -->
+            </properties>
+        </profile>
+    </profiles>
+
 </project>
