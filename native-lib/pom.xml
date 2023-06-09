@@ -32,34 +32,6 @@
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>us.hebi.graal</groupId>
-                <artifactId>native-launchers-maven-plugin</artifactId>
-                <version>1.0-SNAPSHOT</version>
-                <configuration>
-                    <imageDirectory>${project.build.directory}/native/windows-x86_64/$</imageDirectory>
-                    <imageName>${graal.imageName}</imageName>
-                    <launchers>
-                        <launcher>
-                            <name>hello_world</name>
-                            <mainClass>us.hebi.demos.zig.HelloWorld</mainClass>
-                        </launcher>
-                        <launcher>
-                            <name>print_directory</name>
-                            <mainClass>us.hebi.demos.zig.PrintDirectory</mainClass>
-                        </launcher>
-                    </launchers>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>gen-entries</id>
-                        <goals>
-                            <goal>gen-entries</goal>
-                        </goals>
-                        <phase>generate-sources</phase>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
 
@@ -105,6 +77,42 @@
                             <sharedLibrary>true</sharedLibrary>
                             <outputDirectory>${project.build.directory}/native/${app.os-arch}</outputDirectory>
                         </configuration>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>us.hebi.graal</groupId>
+                        <artifactId>native-launchers-maven-plugin</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                        <configuration>
+                            <imageDirectory>${project.build.directory}/native/windows-x86_64/</imageDirectory>
+                            <imageName>${graal.imageName}</imageName>
+                            <launchers>
+                                <launcher>
+                                    <name>hello_world</name>
+                                    <mainClass>us.hebi.demos.zig.HelloWorld</mainClass>
+                                </launcher>
+                                <launcher>
+                                    <name>print_directory</name>
+                                    <mainClass>us.hebi.demos.zig.PrintDirectory</mainClass>
+                                </launcher>
+                            </launchers>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>generate-stubs</id>
+                                <goals>
+                                    <goal>gen-sources</goal>
+                                </goals>
+                                <phase>generate-sources</phase>
+                            </execution>
+                            <execution>
+                                <id>build-executables</id>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
                     </plugin>
 
                     <!-- zig native wrappers -->

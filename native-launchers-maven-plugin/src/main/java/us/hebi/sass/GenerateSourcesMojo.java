@@ -31,39 +31,33 @@ import org.graalvm.nativeimage.c.type.CCharPointerPointer;
 import org.graalvm.nativeimage.c.type.CTypeConversion;
 
 import javax.lang.model.element.Modifier;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
+import java.io.File;
+import java.io.IOException;
 
 /**
+ * Generates a Java source file for the
+ * GraalVM native image entry points.
+ *
  * @author Florian Enner
  * @since 30 Jul 2022
  */
-@Mojo(name = "gen-entries")
+@Mojo(name = "gen-sources")
 @Execute(phase = LifecyclePhase.GENERATE_SOURCES)
-public class GenerateEntriesMojo extends BaseMojo {
+public class GenerateSourcesMojo extends BaseMojo {
 
     @Override
     public void execute() throws MojoExecutionException {
         try {
             generateJavaSource();
-            generateCSources();
         } catch (IOException ioe) {
             throw new MojoExecutionException(ioe);
         }
-        session.getCurrentProject().addCompileSourceRoot(javaSourceDirectory);
+        session.getCurrentProject().addCompileSourceRoot(sourceDirectory);
     }
 
     private File generateJavaSource() throws IOException {
         // Generate Java wrapper class
-        TypeSpec.Builder type = TypeSpec.classBuilder("EntryPoints");
+        TypeSpec.Builder type = TypeSpec.classBuilder("NativeLaunchers");
         for (Launcher launcher : launchers) {
             getLog().debug("Generating Java stub for " + launcher.mainClass);
 
@@ -106,42 +100,10 @@ public class GenerateEntriesMojo extends BaseMojo {
 
         // write to a .java file
         File output = JavaFile.builder(sourcePackage, type.build()).build()
-                .writeToFile(new File(javaSourceDirectory));
+                .writeToFile(new File(sourceDirectory));
         getLog().debug("Generated Java stubs in " + output.getAbsolutePath());
         return output;
 
-    }
-
-    private List<File> generateCSources() throws IOException {
-        List<File> files = new ArrayList<>();
-        for (Launcher launcher : launchers) {
-
-            final byte[] content = loadResourceAsString("template.c")
-                    .replaceAll("\\{\\{HEADER_FILE}}", Optional.ofNullable(launcher.imageName).orElse(imageName) + ".h")
-                    .replaceAll("\\{\\{METHOD_NAME}}", launcher.getConventionalName())
-                    .getBytes(StandardCharsets.UTF_8);
-
-            Path cFile = Paths.get(cSourceDirectory, launcher.name + ".c");
-            Files.createDirectories(cFile.getParent());
-            getLog().debug("Generated C wrapper in " + cFile);
-
-            Files.write(cFile, content,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.WRITE);
-
-        }
-        return files;
-    }
-
-    private static String loadResourceAsString(String name) throws IOException {
-        // There is no simple way in Java 8, so https://stackoverflow.com/a/46613809/3574093
-        try (InputStream is = GenerateEntriesMojo.class.getResourceAsStream(name)) {
-            if (is == null) throw new IllegalStateException("Resource not found: " + name);
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-                return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-            }
-        }
     }
 
 }

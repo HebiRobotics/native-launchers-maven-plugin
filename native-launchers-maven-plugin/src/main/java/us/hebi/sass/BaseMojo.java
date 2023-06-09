@@ -49,14 +49,14 @@ abstract class BaseMojo extends AbstractMojo {
     @Parameter(property = "sourcePackage", defaultValue = "graalvm", required = true)
     protected String sourcePackage;
 
-    @Parameter(property = "javaSourceDirectory", defaultValue = "${project.build.directory}/generated-sources/native-java", required = true)
-    protected String javaSourceDirectory;
-
-    @Parameter(property = "cSourceDirectory", defaultValue = "${project.build.directory}/generated-sources/native-c", required = true)
-    protected String cSourceDirectory;
+    @Parameter(property = "sourceDirectory", defaultValue = "${project.build.directory}/generated-sources/native-launchers", required = true)
+    protected String sourceDirectory;
 
     @Parameter(property = "launchers", required = true)
     protected List<Launcher> launchers;
+
+    @Parameter(property = "timeout", defaultValue = "10", required = true)
+    protected int timeout;
 
     public static class Launcher {
 
@@ -71,6 +71,14 @@ abstract class BaseMojo extends AbstractMojo {
 
         @Parameter(defaultValue = "${project.build.directory}", required = false)
         protected String imageDirectory;
+
+        public String getName() {
+            return name;
+        }
+
+        public String getCFileName() {
+            return name + ".c";
+        }
 
         public String getConventionalName() {
             return "run_" + mainClass.replaceAll("\\.", "_") + "_main";
