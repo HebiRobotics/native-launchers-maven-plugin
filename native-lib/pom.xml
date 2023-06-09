@@ -29,6 +29,26 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>us.hebi.graal</groupId>
+                <artifactId>native-launchers-maven-plugin</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <configuration>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>gen-entries</id>
+                        <goals>
+                            <goal>gen-entries</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
     <profiles>
         <profile>
             <id>native</id>
