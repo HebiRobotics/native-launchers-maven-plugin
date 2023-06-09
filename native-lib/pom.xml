@@ -16,9 +16,14 @@
         <graalvm.version>22.3.2</graalvm.version>
         <graalvm.tools.version>0.9.21</graalvm.tools.version>
         <graalvm.skip>false</graalvm.skip>
-        <zig.version>0.8.0</zig.version>
-        <zig.plugin.version>0.2.1</zig.plugin.version>
-        <graal.imageName>native-lib</graal.imageName>
+
+        <app.mainClass>us.hebi.demos.zig.HelloWorld</app.mainClass>
+        <app.name>${graal.imageName}</app.name>
+        <app.version>${project.version}</app.version>
+        <app.os><!--profiles--></app.os>
+        <app.arch>${os.arch}</app.arch>
+        <app.os-arch>${app.os}-${app.arch}</app.os-arch>
+        <app.imageName>${app.name}</app.imageName>
     </properties>
 
     <dependencies>
@@ -26,30 +31,35 @@
             <groupId>org.graalvm.nativeimage</groupId>
             <artifactId>native-image-base</artifactId>
             <version>${graalvm.version}</version>
-            <scope>provided</scope> <!-- supplied by compiler -->
+            <scope>provided</scope> <!-- supplied by native-image compiler -->
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-        </plugins>
-    </build>
 
     <profiles>
         <profile>
             <id>native</id>
-            <properties>
-                <app.mainClass>us.hebi.demos.zig.HelloWorld</app.mainClass>
-                <app.name>${graal.imageName}</app.name>
-                <app.version>${project.version}</app.version>
-                <app.os><!--profiles--></app.os>
-                <app.arch>${os.arch}</app.arch>
-                <app.os-arch>${app.os}-${app.arch}</app.os-arch>
-                <app.imageName>${app.name}</app.imageName>
-                <zig.platform>${app.arch}-${app.os}-gnu</zig.platform> <!-- TODO: macos has no gnu suffix? -->
-            </properties>
             <build>
                 <plugins>
+
+                    <!-- create property file w/ build info -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.1.0</version>
+                        <executions>
+                            <execution>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>write-project-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <outputFile>
+                                        ${project.build.outputDirectory}/build.properties
+                                    </outputFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
 
                     <!-- compile native library -->
                     <plugin>
@@ -63,19 +73,18 @@
                                 <goals>
                                     <goal>compile-no-fork</goal>
                                 </goals>
-                                <phase>package</phase>
                             </execution>
                         </executions>
                         <configuration>
-                            <mainClass>${app.mainClass}</mainClass>
+                            <outputDirectory>${project.build.directory}/native/${app.os-arch}</outputDirectory>
                             <imageName>${app.imageName}</imageName>
+                            <mainClass>${app.mainClass}</mainClass>
                             <skip>${graalvm.skip}</skip>
                             <skipNativeTests>true</skipNativeTests>
                             <useArgFile>false</useArgFile>
                             <fallback>false</fallback>
                             <verbose>true</verbose>
                             <sharedLibrary>true</sharedLibrary>
-                            <outputDirectory>${project.build.directory}/native/${app.os-arch}</outputDirectory>
                         </configuration>
                     </plugin>
 
@@ -84,8 +93,8 @@
                         <artifactId>native-launchers-maven-plugin</artifactId>
                         <version>1.0-SNAPSHOT</version>
                         <configuration>
-                            <imageDirectory>${project.build.directory}/native/windows-x86_64/</imageDirectory>
-                            <imageName>${graal.imageName}</imageName>
+                            <imageDirectory>${project.build.directory}/native/${app.os-arch}</imageDirectory>
+                            <imageName>${app.imageName}</imageName>
                             <launchers>
                                 <launcher>
                                     <name>hello_world</name>
@@ -98,65 +107,17 @@
                             </launchers>
                         </configuration>
                         <executions>
-                            <execution>
+                            <execution> <!-- before compilation and native-image -->
                                 <id>generate-stubs</id>
                                 <goals>
                                     <goal>gen-sources</goal>
                                 </goals>
-                                <phase>generate-sources</phase>
                             </execution>
-                            <execution>
+                            <execution> <!-- after native-image -->
                                 <id>build-executables</id>
                                 <goals>
-                                    <goal>build</goal>
+                                    <goal>build-launchers</goal>
                                 </goals>
-                                <phase>package</phase>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- zig native wrappers -->
-                    <plugin>
-                        <groupId>io.github.nevgeniev.zig</groupId>
-                        <artifactId>zig-maven-plugin</artifactId>
-                        <version>${zig.plugin.version}</version>
-                        <configuration>
-                            <zigVersion>${zig.version}</zigVersion>
-                            <targets>
-                                <target> <!-- the graalvm image only exists for the current platform  -->
-                                    <platform>${zig.platform}</platform>
-                                    <packageName>ne.zig.demo.amd64.linux</packageName>
-                                </target>
-                            </targets>
-                            <buildDir>${project.build.directory}/native/${app.os-arch}</buildDir>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>zig-build</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>build</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- create property file w/ build info -->
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>properties-maven-plugin</artifactId>
-                        <version>1.1.0</version>
-                        <executions>
-                            <execution>
-                                <phase>generate-resources</phase>
-                                <goals>
-                                    <goal>write-active-profile-properties</goal>
-                                </goals>
-                                <configuration>
-                                    <outputFile>
-                                        ${project.build.outputDirectory}/build.properties
-                                    </outputFile>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>

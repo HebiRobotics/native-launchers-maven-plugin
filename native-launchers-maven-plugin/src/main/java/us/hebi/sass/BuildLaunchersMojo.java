@@ -22,7 +22,6 @@ package us.hebi.sass;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 
@@ -41,16 +40,14 @@ import java.util.stream.Collectors;
  * @author Florian Enner
  * @since 09 Jun 2023
  */
-@Mojo(name = "build")
-@Execute(phase = LifecyclePhase.PACKAGE)
-public class BuildMojo extends BaseMojo {
+@Mojo(name = "build-launchers", defaultPhase = LifecyclePhase.PACKAGE)
+public class BuildLaunchersMojo extends BaseMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
 
             String cTemplate = loadResourceAsString("template.c");
-            getLog().error(String.valueOf(launchers));
             for (Launcher launcher : launchers) {
 
                 Path imgDir = Path.of(Optional.ofNullable(launcher.imageDirectory).orElse(imageDirectory));
@@ -69,17 +66,25 @@ public class BuildMojo extends BaseMojo {
                         StandardOpenOption.WRITE);
                 getLog().info("Generated C source file: " + cFile.toAbsolutePath());
 
-                // TODO: use zig for cross-platform builds? e.g.
+                // TODO: use zig for cross-platform builds? maybe build against a dummy dll for all OS?
                 // zig cc -o hello.exe hello_world.c -I. -L. -lhello-lib
 
                 final String[] args;
                 if (PlatformUtil.isWindows()) {
                     // use MSVC compiler (should be available for native image to work)
-                    args = new String[]{
-                            "cl.exe", "-I.",
+                    runProcess(imgDir, "cl.exe", "-I.",
                             launcher.getCFileName(),
-                            "/link", imgName + ".lib"
-                    };
+                            "/link", imgName + ".lib");
+
+                    // Disable the console window for non-console apps.
+                    // Note:
+                    //   We modify the executable via EditBin because compiling with
+                    //   '/Subsystem:windows' requires a template with a WinMain method
+                    if (!launcher.console) {
+                        getLog().debug("Changing " + launcher.name + " to a non-console app.");
+                        runProcess(imgDir, "EditBin.exe", "/Subsystem:windows", launcher.name + ".exe");
+                    }
+
                 } else {
                     // use built-in llvm toolchain as shown in
                     // https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/
@@ -87,31 +92,37 @@ public class BuildMojo extends BaseMojo {
                     if (graalHome == null) {
                         throw new MojoFailureException("GRAALVM_HOME is not defined");
                     }
-                    args = new String[]{
-                            graalHome + "/languages/llvm/native/bin/clang", "-W1",
+                    runProcess(imgDir, graalHome + "/languages/llvm/native/bin/clang",
+                            "-W1",
                             "-I", "./",
                             "-rpath", "./",
                             "-l", imgName,
                             "-o", launcher.getName(),
-                            launcher.getCFileName()
-                    };
-                }
-
-
-                getLog().info("Compiling C source: [" + String.join(" ", args) + "]");
-                Process process = new ProcessBuilder(args)
-                        .directory(imgDir.toFile())
-                        .inheritIO()
-                        .start();
-                if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
-                    getLog().error("Compilation failed or timed out");
+                            launcher.getCFileName());
                 }
 
             }
-        } catch (Exception ioe) {
+        } catch (IOException ioe) {
             throw new MojoFailureException(ioe);
         }
 
+    }
+
+    private void runProcess(Path directory, String... args) throws MojoExecutionException {
+        try {
+            getLog().info("Executing [" + String.join(" ", args) + "]");
+            Process process = new ProcessBuilder(args)
+                    .directory(directory.toFile())
+                    .inheritIO()
+                    .start();
+            if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
+                throw new MojoExecutionException("Execution failed or timed out");
+            }
+        } catch (InterruptedException interrupted) {
+            throw new MojoExecutionException("Execution timed out", interrupted);
+        } catch (IOException ioe) {
+            throw new MojoExecutionException("Execution failed", ioe);
+        }
     }
 
 

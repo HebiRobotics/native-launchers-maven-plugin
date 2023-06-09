@@ -66,11 +66,14 @@ abstract class BaseMojo extends AbstractMojo {
         @Parameter(property = "mainClass", required = true)
         protected String mainClass;
 
-        @Parameter(property = "imageName", required = false)
+        @Parameter(property = "imageName")
         protected String imageName;
 
-        @Parameter(defaultValue = "${project.build.directory}", required = false)
+        @Parameter(defaultValue = "${project.build.directory}")
         protected String imageDirectory;
+
+        @Parameter(property = "console")
+        protected boolean console = true;
 
         public String getName() {
             return name;

@@ -41,8 +41,7 @@ import java.io.IOException;
  * @author Florian Enner
  * @since 30 Jul 2022
  */
-@Mojo(name = "gen-sources")
-@Execute(phase = LifecyclePhase.GENERATE_SOURCES)
+@Mojo(name = "gen-sources", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class GenerateSourcesMojo extends BaseMojo {
 
     @Override
@@ -59,7 +58,7 @@ public class GenerateSourcesMojo extends BaseMojo {
         // Generate Java wrapper class
         TypeSpec.Builder type = TypeSpec.classBuilder("NativeLaunchers");
         for (Launcher launcher : launchers) {
-            getLog().debug("Generating Java stub for " + launcher.mainClass);
+            getLog().info("Generating native entry point for " + launcher.mainClass);
 
             // Annotation for including the method in the native library
             AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPoint.class)
