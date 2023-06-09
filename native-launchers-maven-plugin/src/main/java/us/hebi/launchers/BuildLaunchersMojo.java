@@ -18,7 +18,7 @@
  * #L%
  */
 
-package us.hebi.sass;
+package us.hebi.launchers;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -32,6 +32,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -41,13 +42,13 @@ import java.util.stream.Collectors;
  * @since 09 Jun 2023
  */
 @Mojo(name = "build-launchers", defaultPhase = LifecyclePhase.PACKAGE)
-public class BuildLaunchersMojo extends BaseMojo {
+public class BuildLaunchersMojo extends BaseConfig {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
 
-            String cTemplate = loadResourceAsString("template.c");
+            String cTemplate = loadResourceAsString("main-template.c");
             for (Launcher launcher : launchers) {
 
                 Path imgDir = Path.of(Optional.ofNullable(launcher.imageDirectory).orElse(imageDirectory));
@@ -70,7 +71,7 @@ public class BuildLaunchersMojo extends BaseMojo {
                 // zig cc -o hello.exe hello_world.c -I. -L. -lhello-lib
 
                 final String[] args;
-                if (PlatformUtil.isWindows()) {
+                if (isWindows()) {
                     // use MSVC compiler (should be available for native image to work)
                     runProcess(imgDir, "cl.exe", "-I.",
                             launcher.getCFileName(),
@@ -102,10 +103,15 @@ public class BuildLaunchersMojo extends BaseMojo {
                 }
 
             }
+
         } catch (IOException ioe) {
             throw new MojoFailureException(ioe);
         }
 
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name").toLowerCase(Locale.US).startsWith("win");
     }
 
     private void runProcess(Path directory, String... args) throws MojoExecutionException {
@@ -124,7 +130,6 @@ public class BuildLaunchersMojo extends BaseMojo {
             throw new MojoExecutionException("Execution failed", ioe);
         }
     }
-
 
     private static String loadResourceAsString(String name) throws IOException {
         // There is no simple way in Java 8, so https://stackoverflow.com/a/46613809/3574093

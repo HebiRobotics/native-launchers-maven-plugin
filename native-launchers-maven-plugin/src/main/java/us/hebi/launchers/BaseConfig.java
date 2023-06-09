@@ -18,7 +18,7 @@
  * #L%
  */
 
-package us.hebi.sass;
+package us.hebi.launchers;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
@@ -31,7 +31,7 @@ import java.util.List;
  * @author Florian Enner
  * @since 09 Jun 2023
  */
-abstract class BaseMojo extends AbstractMojo {
+abstract class BaseConfig extends AbstractMojo {
 
     @Parameter(defaultValue = "${plugin}", readonly = true) // Maven 3 only
     protected PluginDescriptor plugin;
@@ -46,8 +46,8 @@ abstract class BaseMojo extends AbstractMojo {
     @Parameter(property = "imageDirectory", defaultValue = "${project.build.directory}", required = true)
     protected String imageDirectory;
 
-    @Parameter(property = "sourcePackage", defaultValue = "graalvm", required = true)
-    protected String sourcePackage;
+    @Parameter(property = "launcherPackage", defaultValue = "launchers", required = true)
+    protected String launcherPackage;
 
     @Parameter(property = "sourceDirectory", defaultValue = "${project.build.directory}/generated-sources/native-launchers", required = true)
     protected String sourceDirectory;

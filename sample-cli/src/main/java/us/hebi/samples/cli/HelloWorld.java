@@ -1,4 +1,4 @@
-package us.hebi.demos.zig;
+package us.hebi.samples.cli;
 
 /**
  * @author Florian Enner

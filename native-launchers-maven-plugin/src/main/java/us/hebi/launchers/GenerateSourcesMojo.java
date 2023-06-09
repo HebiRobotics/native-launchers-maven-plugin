@@ -18,11 +18,10 @@
  * #L%
  */
 
-package us.hebi.sass;
+package us.hebi.launchers;
 
 import com.squareup.javapoet.*;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugins.annotations.Execute;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.graalvm.nativeimage.IsolateThread;
@@ -33,6 +32,7 @@ import org.graalvm.nativeimage.c.type.CTypeConversion;
 import javax.lang.model.element.Modifier;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Generates a Java source file for the
@@ -42,7 +42,7 @@ import java.io.IOException;
  * @since 30 Jul 2022
  */
 @Mojo(name = "gen-sources", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class GenerateSourcesMojo extends BaseMojo {
+public class GenerateSourcesMojo extends BaseConfig {
 
     @Override
     public void execute() throws MojoExecutionException {
@@ -51,14 +51,36 @@ public class GenerateSourcesMojo extends BaseMojo {
         } catch (IOException ioe) {
             throw new MojoExecutionException(ioe);
         }
+
+        // Add the generated sources to the compilation
         session.getCurrentProject().addCompileSourceRoot(sourceDirectory);
+
+        // Warn if the project is missing a dependency
+        String groupId = "org.graalvm.nativeimage";
+        String artifactId = "native-image-base";
+        String version = "22.3.2";
+        String scope = "provided";
+        boolean hasCompileDependency = session.getCurrentProject().getDependencies().stream()
+                .filter(dep -> Objects.equals(groupId, dep.getGroupId()))
+                .anyMatch(dep -> Objects.equals(artifactId, dep.getArtifactId()));
+        if (!hasCompileDependency) {
+            getLog().info("-------------------------------------------------------------");
+            getLog().error("MISSING REQUIRED LAUNCHER DEPENDENCY :");
+            getLog().info("-------------------------------------------------------------\n" +
+                    "  <dependency>\n" +
+                    "      <groupId>" + groupId + "</groupId>\n" +
+                    "      <artifactId>" + artifactId + "</artifactId>\n" +
+                    "      <version>" + version + "</version>\n" +
+                    "      <scope>" + scope + "</scope>\n" +
+                    "  </dependency>");
+        }
     }
 
     private File generateJavaSource() throws IOException {
         // Generate Java wrapper class
         TypeSpec.Builder type = TypeSpec.classBuilder("NativeLaunchers");
         for (Launcher launcher : launchers) {
-            getLog().info("Generating native entry point for " + launcher.mainClass);
+            getLog().info("Generating launcher entry point for " + launcher.mainClass);
 
             // Annotation for including the method in the native library
             AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPoint.class)
@@ -98,7 +120,7 @@ public class GenerateSourcesMojo extends BaseMojo {
                 .build());
 
         // write to a .java file
-        File output = JavaFile.builder(sourcePackage, type.build()).build()
+        File output = JavaFile.builder(launcherPackage, type.build()).build()
                 .writeToFile(new File(sourceDirectory));
         getLog().debug("Generated Java stubs in " + output.getAbsolutePath());
         return output;
