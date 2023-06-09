@@ -1,4 +1,4 @@
-package us.hebi.demos.zig.apps;
+package us.hebi.demos.zig;
 
 /**
  * @author Florian Enner

@@ -7,5 +7,5 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    return run_print_directory_contents(thread, argc, argv);
+    return run_us_hebi_demos_zig_PrintDirectory_main(thread, argc, argv);
 }

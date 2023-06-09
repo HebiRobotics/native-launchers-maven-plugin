@@ -38,11 +38,15 @@
                 <version>1.0-SNAPSHOT</version>
                 <configuration>
                     <imageDirectory>${project.build.directory}/native/windows-x86_64/$</imageDirectory>
-                    <imageName>{graal.imageName}</imageName>
+                    <imageName>${graal.imageName}</imageName>
                     <launchers>
                         <launcher>
                             <name>hello_world</name>
-                            <mainClass>us.hebi.demos.zig.apps.HelloWorld</mainClass>
+                            <mainClass>us.hebi.demos.zig.HelloWorld</mainClass>
+                        </launcher>
+                        <launcher>
+                            <name>print_directory</name>
+                            <mainClass>us.hebi.demos.zig.PrintDirectory</mainClass>
                         </launcher>
                     </launchers>
                 </configuration>
@@ -52,7 +56,7 @@
                         <goals>
                             <goal>gen-entries</goal>
                         </goals>
-                        <phase>compile</phase>
+                        <phase>generate-sources</phase>
                     </execution>
                 </executions>
             </plugin>
@@ -63,7 +67,7 @@
         <profile>
             <id>native</id>
             <properties>
-                <app.mainClass>us.hebi.demos.zig.EntryPoints</app.mainClass>
+                <app.mainClass>us.hebi.demos.zig.HelloWorld</app.mainClass>
                 <app.name>${graal.imageName}</app.name>
                 <app.version>${project.version}</app.version>
                 <app.os><!--profiles--></app.os>
