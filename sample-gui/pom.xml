@@ -77,12 +77,12 @@
                             <javaStaticSdkVersion>11-ea+10</javaStaticSdkVersion>
                             <javafxStaticSdkVersion>21-ea+9.1</javafxStaticSdkVersion>
                             <nativeImageArgs>
+                                <!-- the gluonfx:sharedlib target does not seem to be working -->
                                 <arg>--shared</arg>
                             </nativeImageArgs>
                             <linkerArgs>
-                                <!-- the gluonfx:sharedlib target does not seem to be working -->
-<!--                                <arg>-shared</arg>-->
-<!--                                <arg>-undefined</arg>-->
+                                <!--                                <arg>-shared</arg>-->
+                                <!--                                <arg>-undefined</arg>-->
                                 <arg>/OUT:${graalvm.imageName}.dll</arg>
                             </linkerArgs>
                         </configuration>

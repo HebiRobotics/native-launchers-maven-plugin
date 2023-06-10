@@ -33,6 +33,15 @@ import java.util.List;
  */
 abstract class BaseConfig extends AbstractMojo {
 
+    @Parameter
+    protected boolean debug = false;
+
+    @Parameter
+    protected String compiler;
+
+    @Parameter
+    protected List<String> compilerArgs;
+
     @Parameter(defaultValue = "${plugin}", readonly = true) // Maven 3 only
     protected PluginDescriptor plugin;
 
@@ -74,6 +83,10 @@ abstract class BaseConfig extends AbstractMojo {
 
         @Parameter(property = "console")
         protected boolean console = true;
+
+        public String getMainClass() {
+            return mainClass;
+        }
 
         public String getName() {
             return name;

@@ -32,8 +32,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Locale;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -48,15 +47,16 @@ public class BuildLaunchersMojo extends BaseConfig {
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
 
-            String cTemplate = loadResourceAsString("main-template.c");
+            String cTemplate = loadResourceAsString("main-dynamic.c");
             for (Launcher launcher : launchers) {
 
                 Path imgDir = Path.of(Optional.ofNullable(launcher.imageDirectory).orElse(imageDirectory));
                 String imgName = Optional.ofNullable(launcher.imageName).orElse(imageName);
+                String outputName = launcher.name + (isWindows() ? ".exe" : "");
 
                 // Generate C source file
                 String cContent = cTemplate
-                        .replaceAll("\\{\\{HEADER_FILE}}", imgName + ".h")
+                        .replaceAll("\\{\\{IMAGE_NAME}}", imgName)
                         .replaceAll("\\{\\{METHOD_NAME}}", launcher.getConventionalName());
 
                 Files.createDirectories(imgDir);
@@ -67,39 +67,44 @@ public class BuildLaunchersMojo extends BaseConfig {
                         StandardOpenOption.WRITE);
                 getLog().info("Generated C source file: " + cFile.toAbsolutePath());
 
-                // TODO: use zig for cross-platform builds? maybe build against a dummy dll for all OS?
-                // zig cc -o hello.exe hello_world.c -I. -L. -lhello-lib
+                // Compile the generated file. The dynamic template has no dependencies,
+                // so we don't need any includes or linker arguments.
+                List<String> compilerArgs = new ArrayList<>();
+                if (this.compiler != null) {
+                    // pick e.g. "zig cc"
+                    compilerArgs.addAll(Arrays.asList(this.compiler.split(" ")));
+                } else if (isWindows()) {
+                    // use an installed zig compiler and build for the host os (no -target ${arch}-${os})
+                    compilerArgs.add("cl");
+                } else {
+                    // use graal's built-in llvm toolchain
+                    compilerArgs.add(getClangPath().toString());
+                }
 
-                final String[] args;
-                if (isWindows()) {
-                    // use MSVC compiler (should be available for native image to work)
-                    runProcess(imgDir, "cl.exe", "-I.",
-                            launcher.getCFileName(),
-                            "/link", imgName + ".lib");
+                // Add added compiler args first to work with "zig cc"
+                if (this.compilerArgs != null) {
+                    compilerArgs.addAll(this.compilerArgs);
+                }
 
-                    // Disable the console window for non-console apps.
-                    // Note:
-                    //   We modify the executable via EditBin because compiling with
-                    //   '/Subsystem:windows' requires a template with a WinMain method
+                // Debug printouts
+                if (debug) {
+                    compilerArgs.add("-DDEBUG");
+                }
+
+                // Add shared arguments
+                compilerArgs.add("-o");
+                compilerArgs.add(outputName);
+                compilerArgs.add(launcher.getCFileName());
+                runProcess(imgDir, compilerArgs);
+
+                // Disable the console window for non-console apps
+                if (!launcher.console && isWindows()) {
+                    // Note that we modify the executable via EditBin because compiling with
+                    // /Subsystem:windows requires a template with a WinMain method
                     if (!launcher.console) {
                         getLog().debug("Changing " + launcher.name + " to a non-console app.");
                         runProcess(imgDir, "EditBin.exe", "/Subsystem:windows", launcher.name + ".exe");
                     }
-
-                } else {
-                    // use built-in llvm toolchain as shown in
-                    // https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/
-                    String graalHome = System.getenv("GRAALVM_HOME");
-                    if (graalHome == null) {
-                        throw new MojoFailureException("GRAALVM_HOME is not defined");
-                    }
-                    runProcess(imgDir, graalHome + "/languages/llvm/native/bin/clang",
-                            "-W1",
-                            "-I", "./",
-                            "-rpath", "./",
-                            "-l", imgName,
-                            "-o", launcher.getName(),
-                            launcher.getCFileName());
                 }
 
             }
@@ -110,11 +115,30 @@ public class BuildLaunchersMojo extends BaseConfig {
 
     }
 
+    private static Path getClangPath() throws MojoFailureException {
+        // use built-in llvm toolchain as shown in
+        // https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/
+        String graalHome = System.getenv("GRAALVM_HOME");
+        if (graalHome == null) {
+            throw new MojoFailureException("GRAALVM_HOME is not defined (needed for built-in clang)");
+        }
+        Path clang = Path.of(graalHome, "/languages/llvm/native/bin/clang");
+        if (!Files.isExecutable(clang)) {
+            throw new MojoFailureException("could not find clang: " + clang + "\n" +
+                    "Please run: $GRAALVM_HOME/bin/gu install llvm-toolchain");
+        }
+        return clang;
+    }
+
     private static boolean isWindows() {
         return System.getProperty("os.name").toLowerCase(Locale.US).startsWith("win");
     }
 
     private void runProcess(Path directory, String... args) throws MojoExecutionException {
+        runProcess(directory, Arrays.asList(args));
+    }
+
+    private void runProcess(Path directory, List<String> args) throws MojoExecutionException {
         try {
             getLog().info("Executing [" + String.join(" ", args) + "]");
             Process process = new ProcessBuilder(args)

@@ -18,7 +18,7 @@
  * #L%
  */
 
-#include "{{HEADER_FILE}}"
+#include "{{IMAGE_NAME}}.h"
 #include <stdio.h>
 
 int main(int argc, char** argv) {
@@ -28,6 +28,5 @@ int main(int argc, char** argv) {
         fprintf( stderr, "initialization error\n" );
         exit(1);
     }
-
     return {{METHOD_NAME}}(thread, argc, argv);
 }

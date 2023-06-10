@@ -67,6 +67,9 @@
                         <artifactId>native-launchers-maven-plugin</artifactId>
                         <version>1.0-SNAPSHOT</version>
                         <configuration>
+<!--                            <compiler>zig</compiler>-->
+<!--                            <compilerArgs>cc</compilerArgs>-->
+                            <debug>false</debug>
                             <imageDirectory>${graalvm.imageDir}</imageDirectory>
                             <imageName>${graalvm.imageName}</imageName>
                             <launchers>
@@ -87,7 +90,7 @@
                                     <goal>gen-sources</goal>
                                 </goals>
                             </execution>
-                            <execution> <!-- after native-image -->
+                            <execution>
                                 <id>build-executables</id>
                                 <goals>
                                     <goal>build-launchers</goal>

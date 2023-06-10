@@ -32,6 +32,7 @@ import org.graalvm.nativeimage.c.type.CTypeConversion;
 import javax.lang.model.element.Modifier;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -65,7 +66,7 @@ public class GenerateSourcesMojo extends BaseConfig {
                 .anyMatch(dep -> Objects.equals(artifactId, dep.getArtifactId()));
         if (!hasCompileDependency) {
             getLog().info("-------------------------------------------------------------");
-            getLog().error("MISSING REQUIRED LAUNCHER DEPENDENCY :");
+            getLog().warn("REQUIRED ANNOTATION DEPENDENCY MAY BE MISSING:");
             getLog().info("-------------------------------------------------------------\n" +
                     "  <dependency>\n" +
                     "      <groupId>" + groupId + "</groupId>\n" +
@@ -87,6 +88,13 @@ public class GenerateSourcesMojo extends BaseConfig {
                     .addMember("name", "$S", launcher.getConventionalName())
                     .build();
 
+            // Optional debug block
+            CodeBlock.Builder debugCode = CodeBlock.builder();
+            if (debug) {
+                debugCode.addStatement("$T.out.println(String.format($S, $T.toString(args)))", System.class,
+                        "[DEBUG] calling " + launcher.getMainClass() + " (args: %s)", Arrays.class);
+            }
+
             // Wrapper that forwards to the specified main
             type.addMethod(MethodSpec.methodBuilder(launcher.getConventionalName())
                     .addModifiers(Modifier.STATIC)
@@ -96,7 +104,9 @@ public class GenerateSourcesMojo extends BaseConfig {
                     .addParameter(int.class, "argc", Modifier.FINAL)
                     .addParameter(CCharPointerPointer.class, "argv", Modifier.FINAL)
                     .beginControlFlow("try")
-                    .addStatement("$T.main(toJavaArgs(argc, argv))", ClassName.bestGuess(launcher.mainClass))
+                    .addStatement("String[] args = toJavaArgs(argc, argv)")
+                    .addCode(debugCode.build())
+                    .addStatement("$T.main(args)", ClassName.bestGuess(launcher.mainClass))
                     .addStatement("return 0")
                     .nextControlFlow("catch (Throwable t)")
                     .addStatement("t.printStackTrace()")
