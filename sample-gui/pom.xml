@@ -22,6 +22,12 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>20</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>org.graalvm.nativeimage</groupId>
             <artifactId>native-image-base</artifactId>
             <version>22.3.2</version>
@@ -36,26 +42,55 @@
                 <plugins>
 
                     <!-- compile native library -->
+                    <!--                    <plugin>
+                                            <groupId>org.graalvm.buildtools</groupId>
+                                            <artifactId>native-maven-plugin</artifactId>
+                                            <version>${graalvm.tools.version}</version>
+                                            <extensions>true</extensions>
+                                            <configuration>
+                                                <outputDirectory>${graalvm.imageDir}</outputDirectory>
+                                                <imageName>${graalvm.imageName}</imageName>
+                                                <sharedLibrary>true</sharedLibrary>
+                                                <skip>${graalvm.skip}</skip>
+                                                <verbose>true</verbose>
+                                                <useArgFile>false</useArgFile>
+                                                <fallback>false</fallback>
+                                                <skipNativeTests>true</skipNativeTests>
+                                            </configuration>
+                                            <executions>
+                                                <execution>
+                                                    <id>build-native</id>
+                                                    <goals>
+                                                        <goal>compile-no-fork</goal>
+                                                    </goals>
+                                                </execution>
+                                            </executions>
+                                        </plugin>-->
+
                     <plugin>
-                        <groupId>org.graalvm.buildtools</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
-                        <version>${graalvm.tools.version}</version>
-                        <extensions>true</extensions>
+                        <groupId>com.gluonhq</groupId>
+                        <artifactId>gluonfx-maven-plugin</artifactId>
+                        <version>1.0.18</version>
                         <configuration>
-                            <outputDirectory>${graalvm.imageDir}</outputDirectory>
-                            <imageName>${graalvm.imageName}</imageName>
-                            <sharedLibrary>true</sharedLibrary>
-                            <skip>${graalvm.skip}</skip>
-                            <verbose>true</verbose>
-                            <useArgFile>false</useArgFile>
-                            <fallback>false</fallback>
-                            <skipNativeTests>true</skipNativeTests>
+                            <target>host</target>
+                            <mainClass>us.hebi.samples.gui.HelloWorld</mainClass>
+                            <javaStaticSdkVersion>11-ea+10</javaStaticSdkVersion>
+                            <javafxStaticSdkVersion>21-ea+9.1</javafxStaticSdkVersion>
+                            <nativeImageArgs>
+                                <arg>--shared</arg>
+                            </nativeImageArgs>
+                            <linkerArgs>
+                                <!-- the gluonfx:sharedlib target does not seem to be working -->
+<!--                                <arg>-shared</arg>-->
+<!--                                <arg>-undefined</arg>-->
+                                <arg>/OUT:${graalvm.imageName}.dll</arg>
+                            </linkerArgs>
                         </configuration>
                         <executions>
                             <execution>
-                                <id>build-native</id>
+                                <phase>package</phase>
                                 <goals>
-                                    <goal>compile-no-fork</goal>
+                                    <goal>build</goal>
                                 </goals>
                             </execution>
                         </executions>
