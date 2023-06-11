@@ -24,10 +24,6 @@ import com.squareup.javapoet.*;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
-import org.graalvm.nativeimage.IsolateThread;
-import org.graalvm.nativeimage.c.function.CEntryPoint;
-import org.graalvm.nativeimage.c.type.CCharPointerPointer;
-import org.graalvm.nativeimage.c.type.CTypeConversion;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
@@ -79,7 +75,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
         for (Launcher launcher : launchers) {
 
             // Annotation for including the method in the native library
-            AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPoint.class)
+            AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPointClass)
                     .addMember("name", "$S", launcher.getConventionalName())
                     .build();
 
@@ -95,9 +91,9 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
                     .addModifiers(Modifier.STATIC)
                     .addAnnotation(cEntry)
                     .returns(int.class)
-                    .addParameter(IsolateThread.class, "thread", Modifier.FINAL)
+                    .addParameter(IsolateThreadClass, "thread", Modifier.FINAL)
                     .addParameter(int.class, "argc", Modifier.FINAL)
-                    .addParameter(CCharPointerPointer.class, "argv", Modifier.FINAL)
+                    .addParameter(CCharPointerPointerClass, "argv", Modifier.FINAL)
                     .beginControlFlow("try")
                     .addStatement("String[] args = toJavaArgs(argc, argv)")
                     .addCode(debugCode.build())
@@ -113,13 +109,13 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
         // Convert C-style argc/argv to Java-style args
         type.addMethod(MethodSpec.methodBuilder("toJavaArgs")
                 .addParameter(int.class, "argc", Modifier.FINAL)
-                .addParameter(CCharPointerPointer.class, "argv", Modifier.FINAL)
+                .addParameter(CCharPointerPointerClass, "argv", Modifier.FINAL)
                 .returns(String[].class)
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                 .addComment("C adds the executable name as the first argument")
                 .addStatement("String[] args = new String[argc - 1]")
                 .beginControlFlow(" for (int i = 0; i < args.length; i++)")
-                .addStatement("args[i] = $T.toJavaString(argv.addressOf(i + 1).read())", CTypeConversion.class)
+                .addStatement("args[i] = $T.toJavaString(argv.addressOf(i + 1).read())", CTypeConversionClass)
                 .endControlFlow()
                 .addStatement("return args")
                 .build());
@@ -162,5 +158,11 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
         }
         return hasDependency;
     }
+
+    // Use ClassName so we can remove the Graal sdk dependency
+    static final ClassName IsolateThreadClass = ClassName.bestGuess("org.graalvm.nativeimage.IsolateThread");
+    static final ClassName CEntryPointClass = ClassName.bestGuess("org.graalvm.nativeimage.c.function.CEntryPoint");
+    static final ClassName CCharPointerPointerClass = ClassName.bestGuess("org.graalvm.nativeimage.c.type.CCharPointerPointer");
+    static final ClassName CTypeConversionClass = ClassName.bestGuess("org.graalvm.nativeimage.c.type.CTypeConversion");
 
 }
