@@ -2,7 +2,7 @@
 
 This plugin creates thin native launchers so that one [native shared library](https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/) can be shared between multiple main methods. This significantly reduces the deployment size of suite of apps (e.g. CLI tools) that want to make use of [GraalVM](https://www.graalvm.org/)'s native-image.
 
-It roughly works like this:
+It roughly works as follows:
 * A Java file with appropriate `@CEntryPoint` methods is generated during the `generate-sources` stage
 * The Java file gets included in the native-image compilation and includes matching symbols
 * A tiny native executable loads the library and calls the native entry point
@@ -21,10 +21,6 @@ bin> cli-hello.exe arg1 arg2
 Hello world!
 ```
 
-**Known issues / limitations**
-* The `@CEntryPoint` annotations require a compile dependency on the graal sdk. Attempts to generate the `.class` file directly ended in errors due to native-image requiring [a matching source file](https://github.com/graalvm/graal-jvmci-8/blob/master/jvmci/jdk.vm.ci.meta/src/jdk/vm/ci/meta/ResolvedJavaType.java#L315-L318).
-* Each platform needs to be compiled individually like the Graal native-image. Static linking requires an existing native-image, and dynamic linking is not supported when cross-compiling (at least on [zig 0.10.1](https://ziglang.org/download/0.10.1/release-notes.html)).
-
 **Things that still need to be figured out**
 * Linux / macOS
   * **Calling apps from another directory currently fails due to the library not being found (!!!)**. The lib should be loaded relative to the binary rather than the working directory.
@@ -32,7 +28,13 @@ Hello world!
 * JavaFX
   * Support JavaFX launchers. The [gluonfx plugin](https://github.com/gluonhq/gluonfx-maven-plugin) added a `sharedlib` target, but for some reason [it does not work with JavaFX code](https://docs.gluonhq.com/#_native_shared_libraries).
 
+**Known issues / limitations**
+* The `@CEntryPoint` annotations require a compile dependency on the graal sdk. Attempts to generate the `.class` file directly ended in errors due to native-image requiring [a matching source file](https://github.com/graalvm/graal-jvmci-8/blob/master/jvmci/jdk.vm.ci.meta/src/jdk/vm/ci/meta/ResolvedJavaType.java#L315-L318).
+* Each platform needs to be compiled individually like the Graal native-image. Static linking requires an existing native-image, and dynamic linking is not supported when cross-compiling (at least on [zig 0.10.1](https://ziglang.org/download/0.10.1/release-notes.html)).
+
 ## Usage
+
+**Warning: Version 0.1 is in a proof-of-concept state. Given the path loading issue on macOS and Linux it's best to consider it Windows-only.** 
 
 1. add the compilation dependency for the generated graal annotations
 ```xml
@@ -50,7 +52,7 @@ Hello world!
 <plugin>
     <groupId>us.hebi.launchers</groupId>
     <artifactId>native-launchers-maven-plugin</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1</version>
     <configuration>
         <outputDirectory>${graalvm.imageDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>
