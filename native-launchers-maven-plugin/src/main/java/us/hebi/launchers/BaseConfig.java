@@ -26,6 +26,7 @@ import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 
@@ -41,24 +42,26 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     protected MavenSession session;
 
-    @Parameter
-    protected boolean debug = false;
-
-    @Parameter
-    protected int timeout = 10;
-
-    // where binaries get copied to. Should be the GraalVM default output
-    // https://github.com/graalvm/native-build-tools/blob/master/native-maven-plugin/src/main/java/org/graalvm/buildtools/maven/AbstractNativeImageMojo.java#L100-L101
     @Parameter(property = "outputDir", defaultValue = "${project.build.directory}", required = true)
-    protected String outputDirectory; // where the binary files get copied to
+    protected String outputDirectory; // default to native-maven-plugin value
 
     @Parameter(property = "imageName", defaultValue = "${project.artifactId}", required = true)
-    protected String imageName;
+    protected String imageName; // default to native-maven-plugin value
 
-    @Parameter(property = "sourceDirectory", defaultValue = "${project.build.directory}/generated-sources/native-launchers", required = true)
+    @Parameter(property = "launchers.skip")
+    protected boolean skip = false;
+
+    @Parameter(property = "launchers.debug")
+    protected boolean debug = false;
+
+    @Parameter(property = "launchers.timeout")
+    protected int timeout = 10;
+
+    @Parameter(property = "launchers.sourceDirectory", required = true,
+            defaultValue = "${project.build.directory}/generated-sources/native-launchers")
     protected String sourceDirectory;
 
-    @Parameter(defaultValue = "launchers", required = true)
+    @Parameter(property = "launchers.sourceDirectory", defaultValue = "launchers", required = true)
     protected String launcherPackage;
 
     @Parameter
@@ -73,12 +76,12 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(required = true)
     protected List<Launcher> launchers;
 
-    public Path getGeneratedJavaSourceDir(){
-        return Path.of(sourceDirectory, "java").toAbsolutePath();
+    public Path getGeneratedJavaSourceDir() {
+        return Paths.get(sourceDirectory, "java").toAbsolutePath();
     }
 
-    public Path getGeneratedCSourceDir(){
-        return Path.of(sourceDirectory, "c").toAbsolutePath();
+    public Path getGeneratedCSourceDir() {
+        return Paths.get(sourceDirectory, "c").toAbsolutePath();
     }
 
     public static class Launcher {
@@ -114,6 +117,21 @@ abstract class BaseConfig extends AbstractMojo {
             return "run_" + mainClass.replaceAll("\\.", "_") + "_main";
         }
 
+    }
+
+    protected void printDebug(String message) {
+        if (debug) {
+            getLog().info(message);
+        } else {
+            getLog().debug(message);
+        }
+    }
+
+    protected boolean shouldSkip() {
+        if (skip) {
+            getLog().info("Skipping native launcher generation (parameter skip is true)");
+        }
+        return skip;
     }
 
 }

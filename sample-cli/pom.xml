@@ -67,9 +67,9 @@
                         <artifactId>native-launchers-maven-plugin</artifactId>
                         <version>1.0-SNAPSHOT</version>
                         <configuration>
-                            <debug>false</debug>
                             <outputDirectory>${graalvm.imageDir}</outputDirectory>
                             <imageName>${graalvm.imageName}</imageName>
+                            <debug>false</debug>
                             <launchers>
                                 <launcher>
                                     <name>cli-hello</name>

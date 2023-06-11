@@ -25,38 +25,47 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 
-import java.io.*;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+
+import static us.hebi.launchers.Utils.*;
 
 /**
  * @author Florian Enner
  * @since 09 Jun 2023
  */
 @Mojo(name = "build-launchers", defaultPhase = LifecyclePhase.PACKAGE)
-public class BuildLaunchersMojo extends BaseConfig {
+public class BuildNativeLaunchersMojo extends BaseConfig {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (shouldSkip()) return;
+
         try {
 
             // Generate wrapper sources
-            String template = loadResourceAsString(GenerateSourcesMojo.class, "main-dynamic.c");
+            String template = loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/main-dynamic.c");
             Path sourceDir = getGeneratedCSourceDir();
             Files.createDirectories(sourceDir);
-            getLog().debug("Generating C sources in " + sourceDir);
+            printDebug("Generating C sources in " + sourceDir);
             for (Launcher launcher : launchers) {
                 String imgName = getNonNull(launcher.imageName, imageName);
                 String sourceCode = fillTemplate(template, imgName, launcher.getConventionalName());
-                writeSourceToDisk(sourceCode, sourceDir, launcher.getCFileName());
+                writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
+                printDebug("Generated source file: " + launcher.getCFileName());
             }
 
             // Build the executables
+            List<String> artifacts = new ArrayList<>();
             List<String> compiler = getCompiler();
             for (Launcher launcher : launchers) {
 
@@ -65,13 +74,15 @@ public class BuildLaunchersMojo extends BaseConfig {
                 Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console);
 
                 // Move result to the desired output directory
-                Path outputDir = Path.of(getNonNull(launcher.outputDirectory, outputDirectory));
+                Path outputDir = Paths.get(getNonNull(launcher.outputDirectory, outputDirectory));
                 Files.createDirectories(outputDir);
                 Path targetFile = outputDir.resolve(outputName);
                 Files.move(exeFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
-                getLog().info("output: " + targetFile);
+                artifacts.add(targetFile.toString());
 
             }
+
+            getLog().info("Produced artifacts:\n " + String.join("\n ", artifacts));
 
         } catch (IOException ioe) {
             throw new MojoFailureException(ioe);
@@ -85,15 +96,6 @@ public class BuildLaunchersMojo extends BaseConfig {
                 .replaceAll("\\{\\{METHOD_NAME}}", methodName);
     }
 
-    private Path writeSourceToDisk(String content, Path targetDir, String fileName) throws IOException {
-        Path srcFile = Files.writeString(targetDir.resolve(fileName), content,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE);
-        getLog().debug("Generated source file: " + fileName);
-        return srcFile;
-    }
-
     private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws IOException {
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
@@ -101,12 +103,8 @@ public class BuildLaunchersMojo extends BaseConfig {
         processArgs.add("-o");
         processArgs.add(outputName);
         processArgs.add(srcFileName);
-        if (debug) {
-            processArgs.add("-DDEBUG");
-        }
-        if (isUnix()) {
-            processArgs.add("-ldl");
-        }
+        if (debug) processArgs.add("-DDEBUG");
+        if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
         runProcess(srcDir, processArgs);
 
@@ -114,7 +112,7 @@ public class BuildLaunchersMojo extends BaseConfig {
         if (!console && isWindows()) {
             // Note that we modify the executable via EditBin because compiling with
             // /Subsystem:windows requires a template with a WinMain method
-            getLog().debug("Changing " + outputName + " to a non-console app.");
+            printDebug("Changing " + outputName + " to a non-console app.");
             runProcess(srcDir, "EditBin.exe", "/Subsystem:windows", outputName);
         }
         return srcDir.resolve(outputName);
@@ -145,11 +143,11 @@ public class BuildLaunchersMojo extends BaseConfig {
         String[] directories = Optional.ofNullable(System.getenv("PATH")).orElse("")
                 .split(isWindows() ? ";" : ":");
         for (String dir : directories) {
-            Path pathDir = Path.of(dir);
+            Path pathDir = Paths.get(dir);
             for (String name : candidates) {
                 Path cmd = pathDir.resolve(name);
                 if (Files.isExecutable(cmd)) {
-                    getLog().debug("Using compiler: " + cmd.toString());
+                    printDebug("Using compiler: " + cmd.toString());
                     return name;
                 }
             }
@@ -162,7 +160,7 @@ public class BuildLaunchersMojo extends BaseConfig {
         // install: $GRAALVM_HOME/bin/gu install llvm-toolchain
         // https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/
         return Optional.ofNullable(System.getenv("GRAALVM_HOME"))
-                .map(graalHome -> Path.of(graalHome, "/languages/llvm/native/bin/clang"))
+                .map(graalHome -> Paths.get(graalHome, "/languages/llvm/native/bin/clang"))
                 .map(Path::toAbsolutePath)
                 .map(Path::toString)
                 .orElse("");
@@ -174,12 +172,10 @@ public class BuildLaunchersMojo extends BaseConfig {
 
     private void runProcess(Path directory, List<String> args) throws IOException {
         try {
-            getLog().debug(String.join(" ", args));
+            printDebug(String.join(" ", args));
             ProcessBuilder builder = new ProcessBuilder(args)
                     .directory(directory.toFile());
-            if (debug) {
-                builder.inheritIO();
-            }
+            if (debug) builder.inheritIO();
             Process process = builder.start();
             if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
                 throw new IOException("Execution timed out");
@@ -188,36 +184,5 @@ public class BuildLaunchersMojo extends BaseConfig {
             throw new IOException("Execution interrupted", interrupted);
         }
     }
-
-    private static String loadResourceAsString(Class<?> clazz, String name) throws IOException {
-        // There is no simple way in Java 8, so https://stackoverflow.com/a/46613809/3574093
-        try (InputStream is = clazz.getResourceAsStream(name)) {
-            if (is == null) throw new IllegalStateException("Resource not found: " + name);
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-                return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-            }
-        }
-    }
-
-    private static <T> T getNonNull(T... choices) {
-        for (T choice : choices) {
-            if (choice != null) return choice;
-        }
-        throw new IllegalArgumentException("all options are null");
-    }
-
-    private static boolean isMac() {
-        return OS.contains("mac");
-    }
-
-    private static boolean isUnix() {
-        return (OS.contains("nix") || OS.contains("nux") || OS.indexOf("aix") > 0);
-    }
-
-    private static boolean isWindows() {
-        return OS.startsWith("win");
-    }
-
-    private static final String OS = System.getProperty("os.name").toLowerCase(Locale.US);
 
 }

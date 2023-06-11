@@ -40,13 +40,15 @@ import java.util.Objects;
  * GraalVM native image entry points.
  *
  * @author Florian Enner
- * @since 30 Jul 2022
+ * @since 09 Jun 2023
  */
 @Mojo(name = "gen-sources", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class GenerateSourcesMojo extends BaseConfig {
+public class GenerateJavaSourcesMojo extends BaseConfig {
 
     @Override
     public void execute() throws MojoExecutionException {
+        if (shouldSkip()) return;
+
         try {
 
             // Create Java source and add to the compilation
@@ -123,7 +125,7 @@ public class GenerateSourcesMojo extends BaseConfig {
 
         // write to a .java file
         Path output = JavaFile.builder(launcherPackage, type.build()).build().writeToPath(targetDir);
-        getLog().debug("Generated Java stubs in " + output);
+        printDebug("Generated Java stubs in " + output);
         return output;
 
     }
