@@ -18,7 +18,6 @@
     <modules>
         <module>native-launchers-maven-plugin</module>
         <module>sample-cli</module>
-        <module>sample-gui</module>
     </modules>
 
 </project>
