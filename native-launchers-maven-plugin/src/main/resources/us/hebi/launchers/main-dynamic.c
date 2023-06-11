@@ -95,14 +95,18 @@ void* checkRef(void* ref){
 // zig cc -o hello.exe cli-hello.c -DDEBUG -target x86_64-windows
 int main(int argc, char** argv) {
 
-    #ifdef _WIN64
+#ifdef _WIN64
      HMODULE module = loadLibrary(L"{{IMAGE_NAME}}.dll");
      CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)getMethodAddress(module, "graal_create_isolate");
      MainMethod run_main = (MainMethod)getMethodAddress(module, "{{METHOD_NAME}}");
-    #else
-     void *handle = checkRef(dlopen ("./{{IMAGE_NAME}}.so", RTLD_LAZY)); // gcc -o test cli-hello.c -ldl
-     CreateIsolateMethod graal_create_isolate = checkRef(dlsym(handle, "graal_create_isolate"));
-     MainMethod run_main = checkRef(dlsym(handle, "{{METHOD_NAME}}"));
+#else
+#ifdef __APPLE__
+     void *handle = checkRef(dlopen ("{{IMAGE_NAME}}.dylib", RTLD_LAZY));
+#else
+     void *handle = checkRef(dlopen ("./{{IMAGE_NAME}}.so", RTLD_LAZY)); // needs -ldl for older glibc
+#endif
+     CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)checkRef(dlsym(handle, "graal_create_isolate"));
+     MainMethod run_main = (MainMethod)checkRef(dlsym(handle, "{{METHOD_NAME}}"));
     #endif
 
    #ifdef DEBUG
