@@ -1,4 +1,4 @@
-# Native Launchers Maven Plugin
+# Native Launchers Maven Plugin (proof of concept stage)
 
 This plugin creates thin native launchers so that one [native shared library](https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/) can be shared between multiple main methods. This significantly reduces the deployment size of suite of apps (e.g. CLI tools) that want to make use of [GraalVM](https://www.graalvm.org/)'s native-image.
 
