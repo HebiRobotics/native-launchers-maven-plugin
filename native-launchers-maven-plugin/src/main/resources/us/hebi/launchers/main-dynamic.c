@@ -21,109 +21,113 @@
  /*
  Template for a wrapper c file that calls a main entry point in a dynamically
  linked native-image shared library. Some benefits of this approach are
-   (1) we can provide better error messages about reasons for failure
-       rather than silently exiting the app.
-   (2) removing compile time dependencies allows us to build the wrappers
-       at any point, i.e., before the native library is built
-   (3) we can cross-compile for all operating systems (e.g. zig cc) without
-       requiring the native images for each OS.
+   (1) we can provide customized debug info and error messages
+   (2) removing compile time dependencies allows building the executables before the native library
+   (3) executables can be cross-compiled without requiring native libraries for each OS
  */
 
- // Typedefs for symbol lookup. The threads are just pointers, so we
- // can use void* and get away without including any graalvm headers.
- typedef void graal_isolate_t;
- typedef void graal_isolatethread_t;
- typedef void graal_create_isolate_params_t;
- typedef int(*CreateIsolateMethod)(graal_create_isolate_params_t*, graal_isolate_t**, graal_isolatethread_t**);
- typedef int(*MainMethod)(graal_isolatethread_t*, int, char**);
+// =========== OS-SPECIFIC DEFINITIONS ===========
+#if _WIN64
+#ifndef OS
+#define OS "Windows"
+#endif
+#ifndef LIB_NAME
+#define LIB_NAME L"{{IMAGE_NAME}}.dll"
+#endif
+#elif __APPLE__
+#ifndef OS
+#define OS "macOS"
+#endif
+#ifndef LIB_NAME
+#define LIB_NAME "{{IMAGE_NAME}}.dylib"
+#endif
+#elif __linux__
+#ifndef OS
+#define OS "Linux"
+#endif
+#ifndef LIB_NAME
+#define LIB_NAME "./{{IMAGE_NAME}}.so"
+#endif
+#endif
 
-#ifdef _WIN64
-
-// Windows
-#include <windows.h>
-#include <stdio.h>
-
-void printError(DWORD err_code) {
- LPTSTR lpBuffer = NULL;
- FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,  err_code, 0, (LPTSTR)&lpBuffer, 0, NULL);
- fprintf( stderr, lpBuffer );
- LocalFree(lpBuffer);
-}
-
-HMODULE loadLibrary(LPCWSTR name) {
-    HMODULE module = LoadLibraryW(name);
-    DWORD err_code = GetLastError();
-    if(err_code != 0) {
-        fprintf( stderr, "[ERROR] unable to load library: '%ls': ", name );
-        printError(err_code);
-        exit(1);
-    }
-    #ifdef DEBUG
-     fprintf( stdout, "[DEBUG] loaded library: %ls\n", name );
-    #endif
-    return module;
-}
-
-FARPROC getMethodAddress(HMODULE module, LPCSTR name) {
-   FARPROC addr = GetProcAddress(module, name);
-   if(addr == 0) {
-        fprintf( stderr, "[ERROR] unable to find '%s': ", name );
-        printError(GetLastError());
-        exit(1);
-   }
-   #ifdef DEBUG
-    fprintf( stdout, "[DEBUG] found method: %s\n", name );
-   #endif
-   return addr;
-}
-
+// =========== PRINTOUTS ===========
+#ifndef DEBUG
+#define PRINT_DEBUG(message)
 #else
-// Linux
+#define PRINT_DEBUG(message) fprintf(stdout, "[DEBUG] %s\n", message)
+#endif
+#define PRINT_ERROR(message) fprintf(stderr, "[ERROR] %s\n", message)
+
+// =========== DEPENDENCIES FOR DLOPEN API ===========
+#ifndef _WIN64
+// Linux & macOS (link -ldl on Linux)
 #include <stdlib.h>
 #include <stdio.h>
 #include <dlfcn.h>
-void* checkRef(void* ref){
-    if(!ref) {
-        fprintf(stderr, "[ERROR] %s\n", dlerror());
-        exit(EXIT_FAILURE);
-    }
-    return ref;
+#else
+// Windows w/ wrappers that make it look the same
+#include <windows.h>
+#include <stdio.h>
+#define RTLD_LAZY 0 // TODO: are there flags we should add?
+void* dlopen(const LPCWSTR name, int flags){
+    HMODULE module = LoadLibraryW(name);
+    return module;
+}
+void* dlsym(void* module, const LPCSTR name){
+    FARPROC addr = GetProcAddress((HMODULE)module, name);
+    return addr;
+}
+char* dlerror(){
+    LPTSTR lpBuffer = NULL;
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,  GetLastError(), 0, (LPTSTR)&lpBuffer, 0, NULL);
+    return lpBuffer;
 }
 #endif
 
+// =========== MAIN CODE ===========
+// Typedefs for symbol lookup. The threads are just pointers, so we
+// can use void* and get away without including any graalvm headers.
+typedef void graal_isolate_t;
+typedef void graal_isolatethread_t;
+typedef void graal_create_isolate_params_t;
+typedef int(*CreateIsolateMethod)(graal_create_isolate_params_t*, graal_isolate_t**, graal_isolatethread_t**);
+typedef int(*MainMethod)(graal_isolatethread_t*, int, char**);
 
-// zig cc -o hello.exe cli-hello.c -DDEBUG -target x86_64-windows
-int main(int argc, char** argv) {
+// Main entry point
+int main(int argc, char** argv){
 
-#ifdef _WIN64
-     HMODULE module = loadLibrary(L"{{IMAGE_NAME}}.dll");
-     CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)getMethodAddress(module, "graal_create_isolate");
-     MainMethod run_main = (MainMethod)getMethodAddress(module, "{{METHOD_NAME}}");
-#else
-#ifdef __APPLE__
-     void *handle = checkRef(dlopen ("{{IMAGE_NAME}}.dylib", RTLD_LAZY));
-#else
-     void *handle = checkRef(dlopen ("./{{IMAGE_NAME}}.so", RTLD_LAZY)); // needs -ldl for older glibc
-#endif
-     CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)checkRef(dlsym(handle, "graal_create_isolate"));
-     MainMethod run_main = (MainMethod)checkRef(dlsym(handle, "{{METHOD_NAME}}"));
-    #endif
+    // Dynamically bind to library
+    PRINT_DEBUG("load library {{IMAGE_NAME}}");
+    void* handle = dlopen(LIB_NAME, RTLD_LAZY);
+    if(handle == 0){
+        PRINT_ERROR(dlerror());
+        exit(EXIT_FAILURE);
+    }
 
-   #ifdef DEBUG
-    fprintf( stdout, "[DEBUG] initializing isolate\n");
-   #endif
+    PRINT_DEBUG("lookup symbol graal_create_isolate");
+    CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)dlsym(handle, "graal_create_isolate");
+    if(graal_create_isolate == 0){
+        PRINT_ERROR(dlerror());
+        exit(EXIT_FAILURE);
+    }
 
-    // Initialize isolate
+    PRINT_DEBUG("lookup symbol {{METHOD_NAME}}");
+    MainMethod run_main = (MainMethod)dlsym(handle, "{{METHOD_NAME}}");
+    if(run_main == 0){
+        PRINT_ERROR(dlerror());
+        exit(EXIT_FAILURE);
+    }
+
+    // Actual main method
+    PRINT_DEBUG("initializing isolate");
     graal_isolate_t *isolate = 0;
     graal_isolatethread_t *thread = 0;
-    if (graal_create_isolate(0, &isolate, &thread) != 0) {
-        fprintf( stderr, "initialization error\n" );
-        return 1;
+    if (graal_create_isolate(0, &isolate, &thread) != 0){
+        PRINT_ERROR("initialization error");
+        exit(EXIT_FAILURE);
     }
 
     // Call into shared lib
-   #ifdef DEBUG
-    fprintf( stdout, "[DEBUG] calling {{METHOD_NAME}}\n");
-   #endif
+    PRINT_DEBUG("calling {{METHOD_NAME}}");
     return run_main(thread, argc, argv);
 }
