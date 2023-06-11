@@ -21,9 +21,16 @@ bin> cli-hello.exe arg1 arg2
 Hello world!
 ```
 
-Known limitations
+**Known issues / limitations**
 * The `@CEntryPoint` annotations require a compile dependency on the graal sdk. Attempts to generate the `.class` file directly ended in errors due to native-image requiring [a matching source file](https://github.com/graalvm/graal-jvmci-8/blob/master/jvmci/jdk.vm.ci.meta/src/jdk/vm/ci/meta/ResolvedJavaType.java#L315-L318).
 * Each platform needs to be compiled individually like the Graal native-image. Static linking requires an existing native-image, and dynamic linking is not supported when cross-compiling (at least on [zig 0.10.1](https://ziglang.org/download/0.10.1/release-notes.html)).
+
+**Things that still need to be figured out**
+* Linux / macOS
+  * **Calling apps from another directory currently fails due to the library not being found (!!!)**. The lib should be loaded relative to the binary rather than the working directory.
+  * Support known relative locations to better support app packages (e.g. macOS bundles)
+* JavaFX
+  * Support JavaFX launchers. The [gluonfx plugin](https://github.com/gluonhq/gluonfx-maven-plugin) added a `sharedlib` target, but for some reason [it does not work with JavaFX code](https://docs.gluonhq.com/#_native_shared_libraries).
 
 ## Usage
 

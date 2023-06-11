@@ -110,7 +110,7 @@ void* checkNotNull(void* handle){
 
 // Main entry point
 int main(int argc, char** argv){
-    PRINT_DEBUG(OS_FAMILY);
+    PRINT_DEBUG("Running on "OS_FAMILY);
 
     // Dynamically bind to library
     PRINT_DEBUG("load library {{IMAGE_NAME}}");

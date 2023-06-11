@@ -7,9 +7,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -53,6 +53,14 @@ class Utils {
                 return reader.lines().collect(Collectors.joining(System.lineSeparator()));
             }
         }
+    }
+
+    public static StringBuilder appendSpaced(StringBuilder builder, String value, int minLength) {
+        builder.append(value);
+        for (int i = value.length(); i < minLength; i++) {
+            builder.append(' ');
+        }
+        return builder;
     }
 
     @SafeVarargs

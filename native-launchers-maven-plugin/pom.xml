@@ -7,10 +7,10 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
-    <name>native-launchers-maven-plugin Maven Mojo</name>
+    <name>Native Launchers Plugin</name>
     <url>https://github.com/HebiRobotics/native-launchers-maven-plugin</url>
     <description>
-        Maven plugin for generating native launchers for GraalVM libraries
+        Maven plugin for generating native launchers for GraalVM shared libraries
     </description>
 
     <organization>
@@ -30,9 +30,9 @@
 
     <!-- source control information: -->
     <scm>
-        <url>https://github.com/HebiRobotics/sass-cli-maven-plugin</url>
-        <connection>scm:git:git://github.com/HebiRobotics/sass-cli-maven-plugin.git</connection>
-        <developerConnection>scm:git:git@github.com:HebiRobotics/sass-cli-maven-plugin.git</developerConnection>
+        <url>https://github.com/HebiRobotics/native-launchers-maven-plugin</url>
+        <connection>scm:git:git://github.com/HebiRobotics/native-launchers-maven-plugin.git</connection>
+        <developerConnection>scm:git:git@github.com:HebiRobotics/native-launchers-maven-plugin.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 
@@ -44,8 +44,7 @@
         </snapshotRepository>
         <repository>
             <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/
-            </url>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
 
@@ -54,7 +53,7 @@
         <developer>
             <id>ennerf</id>
             <name>Florian Enner</name>
-            <email>florian@hebirobotics.com</email>
+            <email>florian at hebirobotics.com</email>
             <url>https://github.com/ennerf</url>
             <organization>HEBI Robotics</organization>
             <organizationUrl>https://github.com/HebiRobotics</organizationUrl>
@@ -70,17 +69,22 @@
         <!-- gpg info set via settings.xml to sign release artifacts-->
         <gpg.keyname/>
 
-        <!-- License Headers (http://www.mojohaus.org/license-maven-plugin/update-file-header-mojo.html) -->
-        <license.licenseName>apache_v2</license.licenseName>
-        <license.addJavaLicenseAfterPackage>false</license.addJavaLicenseAfterPackage>
-        <license.trimHeaderLine>true</license.trimHeaderLine>
-
         <!-- For now, disable 'missing' warnings about undocumented @param and @throws -->
         <doclint>html,syntax,accessibility,reference</doclint>
 
     </properties>
 
     <dependencies>
+        <dependency> <!-- Java code generation -->
+            <groupId>com.squareup</groupId>
+            <artifactId>javapoet</artifactId>
+            <version>1.13.0</version>
+        </dependency>
+        <dependency> <!-- Graal types and annotations -->
+            <groupId>org.graalvm.nativeimage</groupId>
+            <artifactId>native-image-base</artifactId>
+            <version>22.3.2</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
@@ -104,34 +108,10 @@
             <artifactId>plexus-archiver</artifactId>
             <version>4.4.0</version>
         </dependency>
-        <dependency>
-            <groupId>org.graalvm.nativeimage</groupId>
-            <artifactId>native-image-base</artifactId>
-            <version>22.3.2</version>
-        </dependency>
-        <dependency>
-            <groupId>com.squareup</groupId>
-            <artifactId>javapoet</artifactId>
-            <version>1.13.0</version>
-        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-
-            <!-- Plugins required for publishing to Maven Central -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>license-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-            </plugin>
 
             <!-- Compatibility update -->
             <plugin>
@@ -145,6 +125,11 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>license-maven-plugin</artifactId>
                 <version>1.16</version>
+                <configuration>
+                    <licenseName>apache_v2</licenseName>
+                    <trimHeaderLine>true</trimHeaderLine>
+                    <addJavaLicenseAfterPackage>false</addJavaLicenseAfterPackage>
+                </configuration>
                 <executions>
                     <execution>
                         <id>first</id>
@@ -171,79 +156,91 @@
                 </configuration>
             </plugin>
 
-            <!-- Required: Source Jar -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Required: Javadoc Jar -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.0.1</version>
-                <executions>
-                    <execution>
-                        <id>attach-javadoc</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Required: Sign Artifacts -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.6</version>
-                <executions>
-                    <execution>
-                        <id>sign-artifacts</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>sign</goal>
-                        </goals>
-                        <configuration>
-                            <keyname>${gpg.keyname}</keyname>
-                            <passphraseServerId>${gpg.keyname}</passphraseServerId>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Deploy selected modules -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-deploy-plugin</artifactId>
-                <version>3.0.0-M1</version>
-            </plugin>
-
-            <!-- Nexus Staging -->
-            <plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.8</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <serverId>ossrh</serverId>
-                    <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
-                </configuration>
-            </plugin>
-
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <!-- Plugins required for maven central, but not for local deployment -->
+            <id>release</id>
+            <build>
+                <plugins>
+
+                    <!-- Required: Source Jar -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.0.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Required: Javadoc Jar -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.0.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadoc</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Required: Sign Artifacts -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>1.6</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <keyname>${gpg.keyname}</keyname>
+                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Deploy selected modules -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-deploy-plugin</artifactId>
+                        <version>3.0.0-M1</version>
+                    </plugin>
+
+                    <!-- Nexus Staging -->
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.6.8</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

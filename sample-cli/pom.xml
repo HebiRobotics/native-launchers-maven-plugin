@@ -69,7 +69,6 @@
                         <configuration>
                             <outputDirectory>${graalvm.imageDir}</outputDirectory>
                             <imageName>${graalvm.imageName}</imageName>
-                            <debug>false</debug>
                             <launchers>
                                 <launcher>
                                     <name>cli-hello</name>

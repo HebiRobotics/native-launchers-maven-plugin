@@ -35,6 +35,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static us.hebi.launchers.Utils.*;
+
 /**
  * Generates a Java source file for the
  * GraalVM native image entry points.
@@ -75,7 +77,6 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
         // Generate Java wrapper class
         TypeSpec.Builder type = TypeSpec.classBuilder("NativeLaunchers");
         for (Launcher launcher : launchers) {
-            getLog().info("Generating launcher entry point for " + launcher.mainClass);
 
             // Annotation for including the method in the native library
             AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPoint.class)
@@ -124,10 +125,24 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
                 .build());
 
         // write to a .java file
-        Path output = JavaFile.builder(launcherPackage, type.build()).build().writeToPath(targetDir);
-        printDebug("Generated Java stubs in " + output);
-        return output;
+        Path outFile = JavaFile.builder(launcherPackage, type.build()).build().writeToPath(targetDir);
+        StringBuilder msg = new StringBuilder("Generated launcher entry points in ").append(outFile).append(":");
+        getLog().info(appendLauncherEntriesTable(msg));
+        return outFile;
 
+    }
+
+    private StringBuilder appendLauncherEntriesTable(StringBuilder out) {
+        int columnWidth = launchers.stream()
+                .map(Launcher::getMainClass)
+                .mapToInt(String::length)
+                .max().orElse(0);
+        for (Launcher launcher : launchers) {
+            out.append("\n ");
+            appendSpaced(out, launcher.getMainClass(), columnWidth);
+            out.append(" (").append(launcher.getConventionalName()).append(")");
+        }
+        return out;
     }
 
     private boolean checkAnnotationDependency(String groupId, String artifactId, String version, String scope) {

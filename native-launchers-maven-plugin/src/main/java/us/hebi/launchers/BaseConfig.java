@@ -48,14 +48,14 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(property = "imageName", defaultValue = "${project.artifactId}", required = true)
     protected String imageName; // default to native-maven-plugin value
 
-    @Parameter(property = "launchers.skip")
-    protected boolean skip = false;
+    @Parameter(property = "launchers.skip", defaultValue = "false")
+    protected Boolean skip;
 
-    @Parameter(property = "launchers.debug")
-    protected boolean debug = false;
+    @Parameter(property = "launchers.debug", defaultValue = "false")
+    protected Boolean debug;
 
-    @Parameter(property = "launchers.timeout")
-    protected int timeout = 10;
+    @Parameter(property = "launchers.timeout", defaultValue = "10")
+    protected Integer timeout;
 
     @Parameter(property = "launchers.sourceDirectory", required = true,
             defaultValue = "${project.build.directory}/generated-sources/native-launchers")
