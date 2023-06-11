@@ -79,6 +79,9 @@ public class BuildLaunchersMojo extends BaseConfig {
                 } else {
                     // use graal's built-in llvm toolchain
                     compilerArgs.add(getClangPath().toString());
+
+                    // TODO: figure out how to load without a static path?
+                    // TODO: add -ldl ? (https://stackoverflow.com/a/71630334/3574093)
                 }
 
                 // Add added compiler args first to work with "zig cc"

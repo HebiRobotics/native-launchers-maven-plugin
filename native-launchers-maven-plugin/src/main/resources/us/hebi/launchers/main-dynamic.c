@@ -66,7 +66,7 @@ HMODULE loadLibrary(LPCWSTR name) {
 
 FARPROC getMethodAddress(HMODULE module, LPCSTR name) {
    FARPROC addr = GetProcAddress(module, name);
-   if(addr == 0){
+   if(addr == 0) {
         fprintf( stderr, "[ERROR] unable to find '%s': ", name );
         printError(GetLastError());
         exit(1);
@@ -79,7 +79,16 @@ FARPROC getMethodAddress(HMODULE module, LPCSTR name) {
 
 #else
 // Linux
- #include <dlfcn.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <dlfcn.h>
+void* checkRef(void* ref){
+    if(!ref) {
+        fprintf(stderr, "[ERROR] %s\n", dlerror());
+        exit(EXIT_FAILURE);
+    }
+    return ref;
+}
 #endif
 
 
@@ -91,7 +100,9 @@ int main(int argc, char** argv) {
      CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)getMethodAddress(module, "graal_create_isolate");
      MainMethod run_main = (MainMethod)getMethodAddress(module, "{{METHOD_NAME}}");
     #else
-     fprintf( stdout, "Hello Linux\n" );
+     void *handle = checkRef(dlopen ("./{{IMAGE_NAME}}.so", RTLD_LAZY)); // gcc -o test cli-hello.c -ldl
+     CreateIsolateMethod graal_create_isolate = checkRef(dlsym(handle, "graal_create_isolate"));
+     MainMethod run_main = checkRef(dlsym(handle, "{{METHOD_NAME}}"));
     #endif
 
    #ifdef DEBUG
