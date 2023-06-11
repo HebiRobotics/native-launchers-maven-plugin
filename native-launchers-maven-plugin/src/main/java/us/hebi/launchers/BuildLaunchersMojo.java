@@ -84,20 +84,26 @@ public class BuildLaunchersMojo extends BaseConfig {
                     // TODO: add -ldl ? (https://stackoverflow.com/a/71630334/3574093)
                 }
 
-                // Add added compiler args first to work with "zig cc"
+                // Add shared arguments
                 if (this.compilerArgs != null) {
                     compilerArgs.addAll(this.compilerArgs);
                 }
+                compilerArgs.add("-o");
+                compilerArgs.add(outputName);
+                compilerArgs.add(launcher.getCFileName());
 
                 // Debug printouts
                 if (debug) {
                     compilerArgs.add("-DDEBUG");
                 }
 
-                // Add shared arguments
-                compilerArgs.add("-o");
-                compilerArgs.add(outputName);
-                compilerArgs.add(launcher.getCFileName());
+                // Add linker arguments
+                if (isUnix()) {
+                    compilerArgs.add("-ldl");
+                }
+                if (this.linkerArgs != null) {
+                    compilerArgs.addAll(linkerArgs);
+                }
                 runProcess(imgDir, compilerArgs);
 
                 // Disable the console window for non-console apps
@@ -133,9 +139,19 @@ public class BuildLaunchersMojo extends BaseConfig {
         return clang;
     }
 
-    private static boolean isWindows() {
-        return System.getProperty("os.name").toLowerCase(Locale.US).startsWith("win");
+    private static boolean isMac() {
+        return OS.contains("mac");
     }
+
+    private static boolean isUnix() {
+        return (OS.contains("nix") || OS.contains("nux") || OS.indexOf("aix") > 0);
+    }
+
+    private static boolean isWindows() {
+        return OS.startsWith("win");
+    }
+
+    private static final String OS = System.getProperty("os.name").toLowerCase(Locale.US);
 
     private void runProcess(Path directory, String... args) throws MojoExecutionException {
         runProcess(directory, Arrays.asList(args));

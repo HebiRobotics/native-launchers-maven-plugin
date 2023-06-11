@@ -42,6 +42,9 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter
     protected List<String> compilerArgs;
 
+    @Parameter
+    protected List<String> linkerArgs;
+
     @Parameter(defaultValue = "${plugin}", readonly = true) // Maven 3 only
     protected PluginDescriptor plugin;
 
