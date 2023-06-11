@@ -25,6 +25,8 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
 import org.apache.maven.plugins.annotations.Parameter;
 
+import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -33,58 +35,67 @@ import java.util.List;
  */
 abstract class BaseConfig extends AbstractMojo {
 
-    @Parameter
-    protected boolean debug = false;
-
-    @Parameter
-    protected List<String> compiler;
-
-    @Parameter
-    protected List<String> compilerArgs;
-
-    @Parameter
-    protected List<String> linkerArgs;
-
     @Parameter(defaultValue = "${plugin}", readonly = true) // Maven 3 only
     protected PluginDescriptor plugin;
 
     @Parameter(defaultValue = "${session}", readonly = true)
     protected MavenSession session;
 
-    // https://github.com/graalvm/native-build-tools/blob/master/native-maven-plugin/src/main/java/org/graalvm/buildtools/maven/AbstractNativeImageMojo.java#LL106C28-L106C37
+    @Parameter
+    protected boolean debug = false;
+
+    @Parameter
+    protected int timeout = 10;
+
+    // where binaries get copied to. Should be the GraalVM default output
+    // https://github.com/graalvm/native-build-tools/blob/master/native-maven-plugin/src/main/java/org/graalvm/buildtools/maven/AbstractNativeImageMojo.java#L100-L101
+    @Parameter(property = "outputDir", defaultValue = "${project.build.directory}", required = true)
+    protected String outputDirectory; // where the binary files get copied to
+
     @Parameter(property = "imageName", defaultValue = "${project.artifactId}", required = true)
     protected String imageName;
-
-    @Parameter(property = "imageDirectory", defaultValue = "${project.build.directory}", required = true)
-    protected String imageDirectory;
-
-    @Parameter(property = "launcherPackage", defaultValue = "launchers", required = true)
-    protected String launcherPackage;
 
     @Parameter(property = "sourceDirectory", defaultValue = "${project.build.directory}/generated-sources/native-launchers", required = true)
     protected String sourceDirectory;
 
-    @Parameter(property = "launchers", required = true)
+    @Parameter(defaultValue = "launchers", required = true)
+    protected String launcherPackage;
+
+    @Parameter
+    protected List<String> compiler;
+
+    @Parameter
+    protected List<String> compilerArgs = Collections.emptyList();
+
+    @Parameter
+    protected List<String> linkerArgs = Collections.emptyList();
+
+    @Parameter(required = true)
     protected List<Launcher> launchers;
 
-    @Parameter(property = "timeout", defaultValue = "10", required = true)
-    protected int timeout;
+    public Path getGeneratedJavaSourceDir(){
+        return Path.of(sourceDirectory, "java").toAbsolutePath();
+    }
+
+    public Path getGeneratedCSourceDir(){
+        return Path.of(sourceDirectory, "c").toAbsolutePath();
+    }
 
     public static class Launcher {
 
-        @Parameter(property = "name", required = true)
+        @Parameter(required = true)
         protected String name;
 
-        @Parameter(property = "mainClass", required = true)
+        @Parameter(required = true)
         protected String mainClass;
 
-        @Parameter(property = "imageName")
+        @Parameter
+        protected String outputDirectory;
+
+        @Parameter
         protected String imageName;
 
-        @Parameter(defaultValue = "${project.build.directory}")
-        protected String imageDirectory;
-
-        @Parameter(property = "console")
+        @Parameter
         protected boolean console = true;
 
         public String getMainClass() {

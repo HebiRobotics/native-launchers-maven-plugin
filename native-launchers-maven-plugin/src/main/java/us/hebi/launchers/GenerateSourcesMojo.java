@@ -30,8 +30,8 @@ import org.graalvm.nativeimage.c.type.CCharPointerPointer;
 import org.graalvm.nativeimage.c.type.CTypeConversion;
 
 import javax.lang.model.element.Modifier;
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -48,36 +48,28 @@ public class GenerateSourcesMojo extends BaseConfig {
     @Override
     public void execute() throws MojoExecutionException {
         try {
-            generateJavaSource();
+
+            // Create Java source and add to the compilation
+            Path targetDir = getGeneratedJavaSourceDir();
+            generateJavaSource(targetDir);
+            session.getCurrentProject().addCompileSourceRoot(targetDir.toString());
+
+            // Warn if the project is missing a dependency. The annotation seems to
+            // be duplicated across different artifacts, so it may still be there.
+            checkAnnotationDependency(
+                    "org.graalvm.nativeimage",
+                    "native-image-base",
+                    "22.3.2",
+                    "provided"
+            );
+
         } catch (IOException ioe) {
             throw new MojoExecutionException(ioe);
         }
 
-        // Add the generated sources to the compilation
-        session.getCurrentProject().addCompileSourceRoot(sourceDirectory);
-
-        // Warn if the project is missing a dependency
-        String groupId = "org.graalvm.nativeimage";
-        String artifactId = "native-image-base";
-        String version = "22.3.2";
-        String scope = "provided";
-        boolean hasCompileDependency = session.getCurrentProject().getDependencies().stream()
-                .filter(dep -> Objects.equals(groupId, dep.getGroupId()))
-                .anyMatch(dep -> Objects.equals(artifactId, dep.getArtifactId()));
-        if (!hasCompileDependency) {
-            getLog().info("-------------------------------------------------------------");
-            getLog().warn("REQUIRED ANNOTATION DEPENDENCY MAY BE MISSING:");
-            getLog().info("-------------------------------------------------------------\n" +
-                    "  <dependency>\n" +
-                    "      <groupId>" + groupId + "</groupId>\n" +
-                    "      <artifactId>" + artifactId + "</artifactId>\n" +
-                    "      <version>" + version + "</version>\n" +
-                    "      <scope>" + scope + "</scope>\n" +
-                    "  </dependency>");
-        }
     }
 
-    private File generateJavaSource() throws IOException {
+    private Path generateJavaSource(Path targetDir) throws IOException {
         // Generate Java wrapper class
         TypeSpec.Builder type = TypeSpec.classBuilder("NativeLaunchers");
         for (Launcher launcher : launchers) {
@@ -130,11 +122,28 @@ public class GenerateSourcesMojo extends BaseConfig {
                 .build());
 
         // write to a .java file
-        File output = JavaFile.builder(launcherPackage, type.build()).build()
-                .writeToFile(new File(sourceDirectory));
-        getLog().debug("Generated Java stubs in " + output.getAbsolutePath());
+        Path output = JavaFile.builder(launcherPackage, type.build()).build().writeToPath(targetDir);
+        getLog().debug("Generated Java stubs in " + output);
         return output;
 
+    }
+
+    private boolean checkAnnotationDependency(String groupId, String artifactId, String version, String scope) {
+        boolean hasDependency = session.getCurrentProject().getDependencies().stream()
+                .filter(dep -> Objects.equals(groupId, dep.getGroupId()))
+                .anyMatch(dep -> Objects.equals(artifactId, dep.getArtifactId()));
+        if (!hasDependency) {
+            getLog().info("-------------------------------------------------------------");
+            getLog().warn("REQUIRED ANNOTATION DEPENDENCY MAY BE MISSING:");
+            getLog().info("-------------------------------------------------------------\n" +
+                    "  <dependency>\n" +
+                    "      <groupId>" + groupId + "</groupId>\n" +
+                    "      <artifactId>" + artifactId + "</artifactId>\n" +
+                    "      <version>" + version + "</version>\n" +
+                    "      <scope>" + scope + "</scope>\n" +
+                    "  </dependency>");
+        }
+        return hasDependency;
     }
 
 }

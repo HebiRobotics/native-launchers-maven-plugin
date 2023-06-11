@@ -25,12 +25,10 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -47,75 +45,31 @@ public class BuildLaunchersMojo extends BaseConfig {
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
 
-            String cTemplate = loadResourceAsString("main-dynamic.c");
+            // Generate wrapper sources
+            String template = loadResourceAsString(GenerateSourcesMojo.class, "main-dynamic.c");
+            Path sourceDir = getGeneratedCSourceDir();
+            Files.createDirectories(sourceDir);
+            getLog().debug("Generating C sources in " + sourceDir);
+            for (Launcher launcher : launchers) {
+                String imgName = getNonNull(launcher.imageName, imageName);
+                String sourceCode = fillTemplate(template, imgName, launcher.getConventionalName());
+                writeSourceToDisk(sourceCode, sourceDir, launcher.getCFileName());
+            }
+
+            // Build the executables
+            List<String> compiler = getCompiler();
             for (Launcher launcher : launchers) {
 
-                Path imgDir = Path.of(Optional.ofNullable(launcher.imageDirectory).orElse(imageDirectory));
-                String imgName = Optional.ofNullable(launcher.imageName).orElse(imageName);
+                // Compile source
                 String outputName = launcher.name + (isWindows() ? ".exe" : "");
+                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console);
 
-                // Generate C source file
-                String cContent = cTemplate
-                        .replaceAll("\\{\\{IMAGE_NAME}}", imgName)
-                        .replaceAll("\\{\\{METHOD_NAME}}", launcher.getConventionalName());
-
-                Files.createDirectories(imgDir);
-
-                Path cFile = Files.writeString(imgDir.resolve(launcher.getCFileName()), cContent,
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.TRUNCATE_EXISTING,
-                        StandardOpenOption.WRITE);
-                getLog().info("Generated C source file: " + cFile.toAbsolutePath());
-
-                // Compile the generated file. The dynamic template has no dependencies,
-                // so we don't need any includes or linker arguments.
-                List<String> compilerArgs = new ArrayList<>();
-                if (this.compiler != null) {
-                    compilerArgs.addAll(this.compiler);
-                } else {
-                    // Look through PATH
-                    List<String> candidates = isWindows()
-                            ? Arrays.asList("cl.exe", "zig.exe")
-                            : Arrays.asList("cc", "gcc", "clang", "zig", getBuiltinClang());
-                    compilerArgs.add(findExecutableOnPath(candidates));
-
-                    // Note: zig cc works for the host target, but the
-                    // cross-compilation breaks dynamic loading.
-                    if (compilerArgs.get(0).startsWith("zig")) {
-                        compilerArgs.add("cc");
-                    }
-                }
-
-                // Add shared arguments
-                if (this.compilerArgs != null) {
-                    compilerArgs.addAll(this.compilerArgs);
-                }
-                compilerArgs.add("-o");
-                compilerArgs.add(outputName);
-                compilerArgs.add(launcher.getCFileName());
-
-                // Debug printouts
-                if (debug) {
-                    compilerArgs.add("-DDEBUG");
-                }
-
-                // Add linker arguments
-                if (isUnix()) {
-                    // needed for dlopen
-                    compilerArgs.add("-ldl");
-                }
-                if (this.linkerArgs != null) {
-                    compilerArgs.addAll(linkerArgs);
-                }
-                runProcess(imgDir, compilerArgs);
-
-                // Disable the console window for non-console apps
-                if (!launcher.console && isWindows()) {
-                    // Note that we modify the executable via EditBin because compiling with
-                    // /Subsystem:windows requires a template with a WinMain method
-                    getLog().debug("Changing " + outputName + " to a non-console app.");
-                    runProcess(imgDir, "EditBin.exe", "/Subsystem:windows", outputName);
-                }
+                // Move result to the desired output directory
+                Path outputDir = Path.of(getNonNull(launcher.outputDirectory, outputDirectory));
+                Files.createDirectories(outputDir);
+                Path targetFile = outputDir.resolve(outputName);
+                Files.move(exeFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                getLog().info("output: " + targetFile);
 
             }
 
@@ -125,7 +79,69 @@ public class BuildLaunchersMojo extends BaseConfig {
 
     }
 
-    private String findExecutableOnPath(List<String> candidates) throws MojoExecutionException {
+    private String fillTemplate(String template, String imageName, String methodName) {
+        return template
+                .replaceAll("\\{\\{IMAGE_NAME}}", imageName)
+                .replaceAll("\\{\\{METHOD_NAME}}", methodName);
+    }
+
+    private Path writeSourceToDisk(String content, Path targetDir, String fileName) throws IOException {
+        Path srcFile = Files.writeString(targetDir.resolve(fileName), content,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE);
+        getLog().debug("Generated source file: " + fileName);
+        return srcFile;
+    }
+
+    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws IOException {
+        // Compile the generated file
+        List<String> processArgs = new ArrayList<>(compiler);
+        processArgs.addAll(compilerArgs);
+        processArgs.add("-o");
+        processArgs.add(outputName);
+        processArgs.add(srcFileName);
+        if (debug) {
+            processArgs.add("-DDEBUG");
+        }
+        if (isUnix()) {
+            processArgs.add("-ldl");
+        }
+        processArgs.addAll(linkerArgs);
+        runProcess(srcDir, processArgs);
+
+        // Disable the console window for non-console apps
+        if (!console && isWindows()) {
+            // Note that we modify the executable via EditBin because compiling with
+            // /Subsystem:windows requires a template with a WinMain method
+            getLog().debug("Changing " + outputName + " to a non-console app.");
+            runProcess(srcDir, "EditBin.exe", "/Subsystem:windows", outputName);
+        }
+        return srcDir.resolve(outputName);
+    }
+
+    private List<String> getCompiler() throws FileNotFoundException {
+        List<String> compilerArgs = new ArrayList<>();
+        if (compiler != null) {
+            // User-specified compiler
+            compilerArgs.addAll(compiler);
+        } else {
+            // Look through PATH for various candidates
+            List<String> candidates = isWindows()
+                    ? Arrays.asList("cl.exe", "zig.exe")
+                    : Arrays.asList("cc", "gcc", "clang", "zig", getBuiltinClang());
+            compilerArgs.add(findCompilerOnPath(candidates));
+
+            // Note: zig cc works for the host target, but the
+            // cross-compilation breaks dynamic loading.
+            if (compilerArgs.get(0).startsWith("zig")) {
+                compilerArgs.add("cc");
+            }
+        }
+        return compilerArgs;
+    }
+
+    private String findCompilerOnPath(List<String> candidates) throws FileNotFoundException {
         String[] directories = Optional.ofNullable(System.getenv("PATH")).orElse("")
                 .split(isWindows() ? ";" : ":");
         for (String dir : directories) {
@@ -133,12 +149,12 @@ public class BuildLaunchersMojo extends BaseConfig {
             for (String name : candidates) {
                 Path cmd = pathDir.resolve(name);
                 if (Files.isExecutable(cmd)) {
-                    getLog().info("Found executable: " + cmd.toString());
+                    getLog().debug("Using compiler: " + cmd.toString());
                     return name;
                 }
             }
         }
-        throw new MojoExecutionException("None of the supported compilers were found on your system: " + candidates);
+        throw new FileNotFoundException("None of the supported compilers were found on your system: " + candidates);
     }
 
     private static String getBuiltinClang() {
@@ -150,6 +166,44 @@ public class BuildLaunchersMojo extends BaseConfig {
                 .map(Path::toAbsolutePath)
                 .map(Path::toString)
                 .orElse("");
+    }
+
+    private void runProcess(Path directory, String... args) throws IOException {
+        runProcess(directory, Arrays.asList(args));
+    }
+
+    private void runProcess(Path directory, List<String> args) throws IOException {
+        try {
+            getLog().debug(String.join(" ", args));
+            ProcessBuilder builder = new ProcessBuilder(args)
+                    .directory(directory.toFile());
+            if (debug) {
+                builder.inheritIO();
+            }
+            Process process = builder.start();
+            if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
+                throw new IOException("Execution timed out");
+            }
+        } catch (InterruptedException interrupted) {
+            throw new IOException("Execution interrupted", interrupted);
+        }
+    }
+
+    private static String loadResourceAsString(Class<?> clazz, String name) throws IOException {
+        // There is no simple way in Java 8, so https://stackoverflow.com/a/46613809/3574093
+        try (InputStream is = clazz.getResourceAsStream(name)) {
+            if (is == null) throw new IllegalStateException("Resource not found: " + name);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+                return reader.lines().collect(Collectors.joining(System.lineSeparator()));
+            }
+        }
+    }
+
+    private static <T> T getNonNull(T... choices) {
+        for (T choice : choices) {
+            if (choice != null) return choice;
+        }
+        throw new IllegalArgumentException("all options are null");
     }
 
     private static boolean isMac() {
@@ -165,36 +219,5 @@ public class BuildLaunchersMojo extends BaseConfig {
     }
 
     private static final String OS = System.getProperty("os.name").toLowerCase(Locale.US);
-
-    private void runProcess(Path directory, String... args) throws MojoExecutionException {
-        runProcess(directory, Arrays.asList(args));
-    }
-
-    private void runProcess(Path directory, List<String> args) throws MojoExecutionException {
-        try {
-            getLog().info("Executing [" + String.join(" ", args) + "]");
-            Process process = new ProcessBuilder(args)
-                    .directory(directory.toFile())
-                    .inheritIO()
-                    .start();
-            if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
-                throw new MojoExecutionException("Execution failed or timed out");
-            }
-        } catch (InterruptedException interrupted) {
-            throw new MojoExecutionException("Execution timed out", interrupted);
-        } catch (IOException ioe) {
-            throw new MojoExecutionException("Execution failed", ioe);
-        }
-    }
-
-    private static String loadResourceAsString(String name) throws IOException {
-        // There is no simple way in Java 8, so https://stackoverflow.com/a/46613809/3574093
-        try (InputStream is = GenerateSourcesMojo.class.getResourceAsStream(name)) {
-            if (is == null) throw new IllegalStateException("Resource not found: " + name);
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
-                return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-            }
-        }
-    }
 
 }

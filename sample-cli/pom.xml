@@ -68,7 +68,7 @@
                         <version>1.0-SNAPSHOT</version>
                         <configuration>
                             <debug>false</debug>
-                            <imageDirectory>${graalvm.imageDir}</imageDirectory>
+                            <outputDirectory>${graalvm.imageDir}</outputDirectory>
                             <imageName>${graalvm.imageName}</imageName>
                             <launchers>
                                 <launcher>

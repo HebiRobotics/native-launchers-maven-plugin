@@ -20,10 +20,11 @@
 
  /*
  Template for a wrapper c file that calls a main entry point in a dynamically
- linked native-image shared library. Some benefits of this approach are
-   (1) we can provide customized debug info and error messages
-   (2) removing compile time dependencies allows building the executables before the native library
-   (3) potentially simpler cross-compilation (note: zig cc v0.10.1 does not support dynamic loading w/ cross-compilation)
+ linked native-image shared library. Some benefits of doing dynamic linking are
+   (1) customized debug and error messages
+   (2) compilation at any phase without requiring the native library
+   (3) potentially simpler cross-compilation
+       * note: zig cc v0.10.1 does not support dynamic loading w/ cross-compilation
  */
 
 // =========== OS-SPECIFIC DEFINITIONS ===========
@@ -99,6 +100,14 @@ typedef void graal_create_isolate_params_t;
 typedef int(*CreateIsolateMethod)(graal_create_isolate_params_t*, graal_isolate_t**, graal_isolatethread_t**);
 typedef int(*MainMethod)(graal_isolatethread_t*, int, char**);
 
+void* checkNotNull(void* handle){
+    if(handle == 0){
+        PRINT_ERROR(dlerror());
+        exit(EXIT_FAILURE);
+    }
+    return handle;
+}
+
 // Main entry point
 int main(int argc, char** argv){
     PRINT_DEBUG(OS_FAMILY);
@@ -106,24 +115,15 @@ int main(int argc, char** argv){
     // Dynamically bind to library
     PRINT_DEBUG("load library {{IMAGE_NAME}}");
     void* handle = dlopen(LIB_NAME, RTLD_LAZY);
-    if(handle == 0){
-        PRINT_ERROR(dlerror());
-        exit(EXIT_FAILURE);
-    }
+    checkNotNull(handle);
 
     PRINT_DEBUG("lookup symbol graal_create_isolate");
     CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)dlsym(handle, "graal_create_isolate");
-    if(graal_create_isolate == 0){
-        PRINT_ERROR(dlerror());
-        exit(EXIT_FAILURE);
-    }
+    checkNotNull(graal_create_isolate);
 
     PRINT_DEBUG("lookup symbol {{METHOD_NAME}}");
     MainMethod run_main = (MainMethod)dlsym(handle, "{{METHOD_NAME}}");
-    if(run_main == 0){
-        PRINT_ERROR(dlerror());
-        exit(EXIT_FAILURE);
-    }
+    checkNotNull(run_main);
 
     // Actual main method
     PRINT_DEBUG("initializing isolate");
