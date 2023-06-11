@@ -37,7 +37,7 @@ abstract class BaseConfig extends AbstractMojo {
     protected boolean debug = false;
 
     @Parameter
-    protected String compiler;
+    protected List<String> compiler;
 
     @Parameter
     protected List<String> compilerArgs;

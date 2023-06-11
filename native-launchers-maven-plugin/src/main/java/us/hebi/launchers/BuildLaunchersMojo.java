@@ -71,17 +71,19 @@ public class BuildLaunchersMojo extends BaseConfig {
                 // so we don't need any includes or linker arguments.
                 List<String> compilerArgs = new ArrayList<>();
                 if (this.compiler != null) {
-                    // pick e.g. "zig cc"
-                    compilerArgs.addAll(Arrays.asList(this.compiler.split(" ")));
-                } else if (isWindows()) {
-                    // use an installed zig compiler and build for the host os (no -target ${arch}-${os})
-                    compilerArgs.add("cl");
+                    compilerArgs.addAll(this.compiler);
                 } else {
-                    // use graal's built-in llvm toolchain
-                    compilerArgs.add(getClangPath().toString());
+                    // Look through PATH
+                    List<String> candidates = isWindows()
+                            ? Arrays.asList("cl.exe", "zig.exe")
+                            : Arrays.asList("cc", "gcc", "clang", "zig", getBuiltinClang());
+                    compilerArgs.add(findExecutableOnPath(candidates));
 
-                    // TODO: figure out how to load without a static path?
-                    // TODO: add -ldl ? (https://stackoverflow.com/a/71630334/3574093)
+                    // Note: zig cc works for the host target, but the
+                    // cross-compilation breaks dynamic loading.
+                    if (compilerArgs.get(0).startsWith("zig")) {
+                        compilerArgs.add("cc");
+                    }
                 }
 
                 // Add shared arguments
@@ -99,6 +101,7 @@ public class BuildLaunchersMojo extends BaseConfig {
 
                 // Add linker arguments
                 if (isUnix()) {
+                    // needed for dlopen
                     compilerArgs.add("-ldl");
                 }
                 if (this.linkerArgs != null) {
@@ -110,10 +113,8 @@ public class BuildLaunchersMojo extends BaseConfig {
                 if (!launcher.console && isWindows()) {
                     // Note that we modify the executable via EditBin because compiling with
                     // /Subsystem:windows requires a template with a WinMain method
-                    if (!launcher.console) {
-                        getLog().debug("Changing " + launcher.name + " to a non-console app.");
-                        runProcess(imgDir, "EditBin.exe", "/Subsystem:windows", launcher.name + ".exe");
-                    }
+                    getLog().debug("Changing " + outputName + " to a non-console app.");
+                    runProcess(imgDir, "EditBin.exe", "/Subsystem:windows", outputName);
                 }
 
             }
@@ -124,19 +125,31 @@ public class BuildLaunchersMojo extends BaseConfig {
 
     }
 
-    private static Path getClangPath() throws MojoFailureException {
-        // use built-in llvm toolchain as shown in
+    private String findExecutableOnPath(List<String> candidates) throws MojoExecutionException {
+        String[] directories = Optional.ofNullable(System.getenv("PATH")).orElse("")
+                .split(isWindows() ? ";" : ":");
+        for (String dir : directories) {
+            Path pathDir = Path.of(dir);
+            for (String name : candidates) {
+                Path cmd = pathDir.resolve(name);
+                if (Files.isExecutable(cmd)) {
+                    getLog().info("Found executable: " + cmd.toString());
+                    return name;
+                }
+            }
+        }
+        throw new MojoExecutionException("None of the supported compilers were found on your system: " + candidates);
+    }
+
+    private static String getBuiltinClang() {
+        // the graalvm llvm toolchain includes a clang
+        // install: $GRAALVM_HOME/bin/gu install llvm-toolchain
         // https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/
-        String graalHome = System.getenv("GRAALVM_HOME");
-        if (graalHome == null) {
-            throw new MojoFailureException("GRAALVM_HOME is not defined (needed for built-in clang)");
-        }
-        Path clang = Path.of(graalHome, "/languages/llvm/native/bin/clang");
-        if (!Files.isExecutable(clang)) {
-            throw new MojoFailureException("could not find clang: " + clang + "\n" +
-                    "Please run: $GRAALVM_HOME/bin/gu install llvm-toolchain");
-        }
-        return clang;
+        return Optional.ofNullable(System.getenv("GRAALVM_HOME"))
+                .map(graalHome -> Path.of(graalHome, "/languages/llvm/native/bin/clang"))
+                .map(Path::toAbsolutePath)
+                .map(Path::toString)
+                .orElse("");
     }
 
     private static boolean isMac() {

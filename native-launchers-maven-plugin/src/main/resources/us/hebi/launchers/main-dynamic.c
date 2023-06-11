@@ -23,30 +23,36 @@
  linked native-image shared library. Some benefits of this approach are
    (1) we can provide customized debug info and error messages
    (2) removing compile time dependencies allows building the executables before the native library
-   (3) executables can be cross-compiled without requiring native libraries for each OS
+   (3) potentially simpler cross-compilation (note: zig cc v0.10.1 does not support dynamic loading w/ cross-compilation)
  */
 
 // =========== OS-SPECIFIC DEFINITIONS ===========
 #if _WIN64
-#ifndef OS
-#define OS "Windows"
+#ifndef OS_FAMILY
+#define OS_FAMILY "Windows"
 #endif
 #ifndef LIB_NAME
 #define LIB_NAME L"{{IMAGE_NAME}}.dll"
 #endif
 #elif __APPLE__
-#ifndef OS
-#define OS "macOS"
+#ifndef OS_FAMILY
+#define OS_FAMILY "macOS"
+#endif
+#ifndef MACOS_LIB_PATH
+#define MACOS_LIB_PATH ""
 #endif
 #ifndef LIB_NAME
-#define LIB_NAME "{{IMAGE_NAME}}.dylib"
+#define LIB_NAME MACOS_LIB_PATH"{{IMAGE_NAME}}.dylib"
 #endif
 #elif __linux__
-#ifndef OS
-#define OS "Linux"
+#ifndef OS_FAMILY
+#define OS_FAMILY "Linux"
+#endif
+#ifndef LINUX_LIB_PATH
+#define LINUX_LIB_PATH "./"
 #endif
 #ifndef LIB_NAME
-#define LIB_NAME "./{{IMAGE_NAME}}.so"
+#define LIB_NAME LINUX_LIB_PATH"{{IMAGE_NAME}}.so"
 #endif
 #endif
 
@@ -95,6 +101,7 @@ typedef int(*MainMethod)(graal_isolatethread_t*, int, char**);
 
 // Main entry point
 int main(int argc, char** argv){
+    PRINT_DEBUG(OS_FAMILY);
 
     // Dynamically bind to library
     PRINT_DEBUG("load library {{IMAGE_NAME}}");
