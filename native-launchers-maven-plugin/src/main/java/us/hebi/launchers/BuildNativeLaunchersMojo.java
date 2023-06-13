@@ -56,7 +56,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             printDebug("Generating C sources in " + sourceDir);
             for (Launcher launcher : launchers) {
                 String imgName = getNonNull(launcher.imageName, imageName);
-                String sourceCode = fillTemplate(template, imgName, launcher.getConventionalName());
+                String sourceCode = fillTemplate(template, imgName, launcher.getSymbolName());
                 writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
                 printDebug("Generated source file: " + launcher.getCFileName());
             }

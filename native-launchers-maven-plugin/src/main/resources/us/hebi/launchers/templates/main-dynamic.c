@@ -120,7 +120,7 @@ int main(int argc, char** argv){
     checkNotNull(run_main);
 
     // Actual main method
-    PRINT_DEBUG("initializing isolate");
+    PRINT_DEBUG("creating isolate thread");
     graal_isolate_t *isolate = 0;
     graal_isolatethread_t *thread = 0;
     if (graal_create_isolate(0, &isolate, &thread) != 0){
