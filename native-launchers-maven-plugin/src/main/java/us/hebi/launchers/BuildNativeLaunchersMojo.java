@@ -31,10 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static us.hebi.launchers.Utils.*;
@@ -182,6 +179,29 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             }
         } catch (InterruptedException interrupted) {
             throw new IOException("Execution interrupted", interrupted);
+        }
+    }
+
+    /**
+     * Where the library can be found relative to the executable:
+     * Default to same directory and Conveyor-like app package layouts
+     */
+    static List<String> getDefaultLoadingPathOptions() {
+        if (isWindows()) {
+            return Collections.emptyList();
+        } else if (isMac()) {
+            return Arrays.asList(
+                    "-Wl,-rpath,@loader_path",
+                    "-Wl,-rpath,@loader_path/../Frameworks",
+                    "-Wl,-rpath,@loader_path/../runtime/Contents/Home/lib",
+                    "-Wl,-rpath,@loader_path/../runtime/Contents/Home/lib/server"
+            );
+        } else {
+            return Arrays.asList(
+                    "-Wl,-rpath,${ORIGIN}",
+                    "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib",
+                    "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib/server"
+            );
         }
     }
 

@@ -32,28 +32,22 @@
 #ifndef OS_FAMILY
 #define OS_FAMILY "Windows"
 #endif
-#ifndef LIB_NAME
-#define LIB_NAME L"{{IMAGE_NAME}}.dll"
+#ifndef LIB_FILE
+#define LIB_FILE L"{{IMAGE_NAME}}.dll"
 #endif
 #elif __APPLE__
 #ifndef OS_FAMILY
 #define OS_FAMILY "macOS"
 #endif
-#ifndef MACOS_LIB_PATH
-#define MACOS_LIB_PATH ""
-#endif
-#ifndef LIB_NAME
-#define LIB_NAME MACOS_LIB_PATH"{{IMAGE_NAME}}.dylib"
+#ifndef LIB_FILE
+#define LIB_FILE "{{IMAGE_NAME}}.dylib"
 #endif
 #elif __linux__
 #ifndef OS_FAMILY
 #define OS_FAMILY "Linux"
 #endif
-#ifndef LINUX_LIB_PATH
-#define LINUX_LIB_PATH "./"
-#endif
-#ifndef LIB_NAME
-#define LIB_NAME LINUX_LIB_PATH"{{IMAGE_NAME}}.so"
+#ifndef LIB_FILE
+#define LIB_FILE "{{IMAGE_NAME}}.so"
 #endif
 #endif
 
@@ -114,7 +108,7 @@ int main(int argc, char** argv){
 
     // Dynamically bind to library
     PRINT_DEBUG("load library {{IMAGE_NAME}}");
-    void* handle = dlopen(LIB_NAME, RTLD_LAZY);
+    void* handle = dlopen(LIB_FILE, RTLD_LAZY);
     checkNotNull(handle);
 
     PRINT_DEBUG("lookup symbol graal_create_isolate");
