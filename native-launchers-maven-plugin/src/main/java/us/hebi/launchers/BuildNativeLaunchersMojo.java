@@ -103,6 +103,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         if (debug) processArgs.add("-DDEBUG");
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
+        processArgs.addAll(getDefaultLoadingPathOptions());
         runProcess(srcDir, processArgs);
 
         // Disable the console window for non-console apps
