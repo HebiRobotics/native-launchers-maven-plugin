@@ -1,19 +1,14 @@
-name: Native Release
+name: Build
 
-on:
-  push:
-    branches: [ release/native ]
-  workflow_dispatch:
-    inputs:
-
+on: [ workflow_dispatch, workflow_call ]
 jobs:
   build:
     strategy:
       matrix:
         os: [ubuntu-20.04, windows-2019, macos-11]
-    
     runs-on: ${{ matrix.os }}
     continue-on-error: true
+    
     steps:
     - uses: actions/checkout@v3
     - uses: stCarolas/setup-maven@v4.5
@@ -40,7 +35,7 @@ jobs:
     - name: Build native image and launchers
       run: mvn package -Pnative
       
-    - name: Upload build
+    - name: Upload native images
       uses: actions/upload-artifact@v3
       with:
         name: native-images
