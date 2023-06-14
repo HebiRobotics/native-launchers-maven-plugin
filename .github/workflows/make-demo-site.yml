@@ -13,8 +13,12 @@ jobs:
     needs: build
     runs-on: macos-aarch64
     steps:
-      - uses: actions/checkout@v3        
-      - run: mvn clean      
+      - uses: actions/checkout@v3       
+      
+      - name: Clean workspace
+        run: |
+          rm -rf ./sample-cli/target/image
+          rm -rf ./output
       
       - name: Download native artifacts
         uses: actions/download-artifact@v3
