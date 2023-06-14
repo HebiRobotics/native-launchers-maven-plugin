@@ -1,0 +1,48 @@
+name: Native Release
+
+on:
+  push:
+    branches: [ release/native ]
+  workflow_dispatch:
+    inputs:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, windows-2019, macos-11]
+    
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v3
+    - uses: stCarolas/setup-maven@v4.5
+      with:
+        maven-version: 3.9.1
+        
+    - uses: graalvm/setup-graalvm@v1
+      with:
+        version: 'latest'
+        java-version: '17'
+        set-java-home: 'true'
+        components: 'native-image'
+        cache: 'maven'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        native-image-job-reports: 'true'
+        
+    - name: Show versions
+      run: |
+          echo "GRAALVM_HOME: $GRAALVM_HOME"
+          echo "JAVA_HOME: $JAVA_HOME"
+          java --version
+          native-image --version
+          
+    - name: Build native image and launchers
+      run: mvn package -Pnative
+      
+    - name: Upload build
+      uses: actions/upload-artifact@v3
+      with:
+        name: native-images
+        path: sample-cli/target/image/**
+        retention-days: 10
