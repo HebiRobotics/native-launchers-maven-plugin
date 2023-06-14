@@ -15,7 +15,7 @@
     <properties>
         <graalvm.version>22.3.2</graalvm.version>
         <graalvm.tools.version>0.9.21</graalvm.tools.version>
-        <imageName>native-cli</imageName>
+        <imageName>launchers-native-cli</imageName>
         <outputDir>${project.build.directory}/image</outputDir>
         <sharedLibrary>true</sharedLibrary>
         <skipNativeBuild>false</skipNativeBuild>
@@ -46,11 +46,11 @@
                             <imageName>${imageName}</imageName>
                             <launchers>
                                 <launcher>
-                                    <name>cli-hello</name>
+                                    <name>launchers-hello</name>
                                     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
                                 </launcher>
                                 <launcher>
-                                    <name>cli-dir</name>
+                                    <name>launchers-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
                                 </launcher>
                             </launchers>
