@@ -30,7 +30,7 @@ class NativeLaunchers {
       return 0;
     } catch (Throwable t) {
       t.printStackTrace();
-      return -1;
+      return 1;
     }
   }
 

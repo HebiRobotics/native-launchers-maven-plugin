@@ -101,7 +101,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
                     .addStatement("return 0")
                     .nextControlFlow("catch (Throwable t)")
                     .addStatement("t.printStackTrace()")
-                    .addStatement("return -1")
+                    .addStatement("return 1")
                     .endControlFlow()
                     .build());
         }
