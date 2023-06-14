@@ -22,7 +22,7 @@ jobs:
           path: ./sample-cli/target/image
 
       - name: Build Site
-        run: conveyor make copied-site
+        run: conveyor make site
 
       - name: Upload Site
         uses: actions/upload-artifact@v3
