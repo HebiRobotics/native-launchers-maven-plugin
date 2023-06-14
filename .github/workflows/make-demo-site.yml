@@ -17,7 +17,7 @@ jobs:
       
       - name: Clean workspace
         run: |
-          rm -rf ./sample-cli/target/image
+          rm -rf ./sample-cli/target
           rm -rf ./output
       
       - name: Download native artifacts
