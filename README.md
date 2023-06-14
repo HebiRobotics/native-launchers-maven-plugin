@@ -2,6 +2,8 @@
 
 This plugin creates thin native launchers so that a single [native shared library](https://github.com/oracle/graal/blob/release/graal-vm/22.3/docs/reference-manual/native-image/InteropWithNativeCode.md) can be shared between multiple main methods. This significantly reduces the deployment size of multi-app bundles (e.g. CLI tools) that want to make use of [GraalVM](https://www.graalvm.org/)'s native-image.
 
+For a full demo project you can take a look at the [sample-cli](./sample-cli/pom.xml) module, the [Conveyor](https://conveyor.hydraulic.dev/) [configuration](./conveyor.conf), and the corresponding the [Github Actions pipeline](.github/workflows/build-demo-images.yml). Installing one of the signed [pre-built packages](https://hebirobotics.github.io/native-launchers-maven-plugin/download.html) places the `launcher-hello` and `launcher-dir` apps on the path. 
+
 ## How does it work?
 
 The plugin specifies the name of the executable and the corresponding Java method, e.g.,
@@ -78,7 +80,7 @@ Hello world!
 <plugin>
     <groupId>us.hebi.launchers</groupId>
     <artifactId>native-launchers-maven-plugin</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
     <configuration>
         <outputDirectory>${graalvm.outputDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>

@@ -193,6 +193,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         } else if (isMac()) {
             return Arrays.asList(
                     "-Wl,-rpath,@loader_path",
+                    "-Wl,-rpath,@loader_path/../lib",
                     "-Wl,-rpath,@loader_path/../Frameworks",
                     "-Wl,-rpath,@loader_path/../runtime/Contents/Home/lib",
                     "-Wl,-rpath,@loader_path/../runtime/Contents/Home/lib/server"
@@ -200,6 +201,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         } else {
             return Arrays.asList(
                     "-Wl,-rpath,${ORIGIN}",
+                    "-Wl,-rpath,${ORIGIN}/../lib",
                     "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib",
                     "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib/server"
             );
