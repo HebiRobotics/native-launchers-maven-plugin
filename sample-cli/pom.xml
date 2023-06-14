@@ -71,11 +71,11 @@
                             <imageName>${imageName}</imageName>
                             <launchers>
                                 <launcher>
-                                    <name>launchers-hello</name>
+                                    <name>launcher-hello</name>
                                     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
                                 </launcher>
                                 <launcher>
-                                    <name>launchers-dir</name>
+                                    <name>launcher-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
                                 </launcher>
                             </launchers>
