@@ -1,4 +1,4 @@
-name: Build
+name: Build Demo Images
 
 on: [ workflow_dispatch, workflow_call ]
 
@@ -39,7 +39,7 @@ jobs:
     - name: Upload native images
       uses: actions/upload-artifact@v3
       with:
-        name: native-images
+        name: native-launchers-images
         path: sample-cli/target/image/**
         retention-days: 10
 
@@ -61,6 +61,6 @@ jobs:
       - name: Upload native image
         uses: actions/upload-artifact@v3
         with:
-          name: native-images
+          name: native-launchers-images
           path: sample-cli/target/image/**
           retention-days: 10

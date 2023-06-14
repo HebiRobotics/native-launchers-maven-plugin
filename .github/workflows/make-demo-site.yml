@@ -1,25 +1,29 @@
-name: Deploy Demo
+name: Make Demo Site
 on:
   push:
     branches: [ release/demo-app ]
   workflow_dispatch:
+    inputs:
 
 jobs:
   build:
-    uses: ./.github/workflows/build-native.yml
+    uses: ./.github/workflows/build-demo-images.yml
       
   deploy:
     needs: build
     runs-on: macos-aarch64
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3              
+      - uses: AutoModality/action-clean@v1
+      - uses: actions/checkout@v3              
       
       - name: Download native artifacts
         uses: actions/download-artifact@v3
         with:
-          name: native-images
+          name: native-launchers-images
           path: ./sample-cli/target/image
+
+      - name: Set executable bits (not retained by upload action)
+        run: chmod +x ./sample-cli/target/image/*.*
 
       - name: Build Site
         run: conveyor make site
@@ -27,6 +31,6 @@ jobs:
       - name: Upload Site
         uses: actions/upload-artifact@v3
         with:
-          name: conveyor-site
+          name: native-launchers-site
           path: ./output/**
           retention-days: 10
