@@ -21,7 +21,12 @@ jobs:
           name: native-images
           path: ./sample-cli/target/image
 
-      - name: Deploy to Github
-        env:
-          OAUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Site
         run: conveyor make copied-site
+
+      - name: Upload Site
+        uses: actions/upload-artifact@v3
+        with:
+          name: conveyor-site
+          path: ./output/**
+          retention-days: 10
