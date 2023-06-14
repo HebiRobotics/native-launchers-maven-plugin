@@ -27,7 +27,7 @@ jobs:
           path: ./sample-cli/target/image
 
       - name: Set executable bits (not retained by upload action)
-        run: chmod +x ./sample-cli/target/image/*.*
+        run: chmod +x ./sample-cli/target/image/*/*
 
       - name: Build Site
         run: conveyor make site
