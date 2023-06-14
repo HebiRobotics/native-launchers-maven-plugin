@@ -1,8 +1,9 @@
 name: Build
 
 on: [ workflow_dispatch, workflow_call ]
+
 jobs:
-  build:
+  build-amd64:
     strategy:
       matrix:
         os: [ubuntu-20.04, windows-2019, macos-11]
@@ -41,3 +42,25 @@ jobs:
         name: native-images
         path: sample-cli/target/image/**
         retention-days: 10
+
+  build-macos-aarch64:
+    runs-on: [self-hosted, macos-aarch64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3        
+
+      - uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: 3.9.1
+          
+      - name: Build macos-aarch64 image
+        run: |
+          export JAVA_HOME=${GRAALVM_HOME}
+          mvn clean package -Pnative
+          
+      - name: Upload native image
+        uses: actions/upload-artifact@v3
+        with:
+          name: native-images
+          path: sample-cli/target/image/**
+          retention-days: 10

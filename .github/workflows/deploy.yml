@@ -1,52 +1,27 @@
-name: Deploy
-on: [workflow_dispatch]
-jobs:
-  build-amd64:
-    uses: ./.github/workflows/build-native.yml
-    
-  build-macos-aarch64:
-    runs-on: [self-hosted, macos-aarch64]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3        
+name: Deploy Demo
+on:
+  push:
+    branches: [ release/demo-app ]
+  workflow_dispatch:
 
-      - uses: stCarolas/setup-maven@v4.5
-        with:
-          maven-version: 3.9.1
-          
-      - name: Build macos-aarch64 image
-        run: |
-          export JAVA_HOME=${GRAALVM_HOME}
-          mvn clean package -Pnative
-          
-      - name: Upload native image
-        uses: actions/upload-artifact@v3
-        with:
-          name: native-images
-          path: sample-cli/target/image/**
-          retention-days: 10
+jobs:
+  build:
+    uses: ./.github/workflows/build-native.yml
       
   deploy:
-    needs: [build-amd64, build-macos-aarch64]
-    runs-on: [self-hosted, macos-aarch64]
+    needs: build
+    runs-on: macos-aarch64
     steps:
       - name: Checkout
         uses: actions/checkout@v3              
       
-      - name: Download artifact
+      - name: Download native artifacts
         uses: actions/download-artifact@v3
         with:
-          # This is the name of the "Upload artifact" action above.
           name: native-images
-          
-          # This path is pointed to by your conveyor.conf
           path: ./sample-cli/target/image
-          
-      - name: Run Conveyor     
-        uses: hydraulic-software/conveyor/actions/build@v9.1
+
+      - name: Deploy to Github
         env:
           OAUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          command: make copied-site
-          signing_key: ${{ secrets.SIGNING_KEY }}
-          agree_to_license: 1
+        run: conveyor make copied-site
