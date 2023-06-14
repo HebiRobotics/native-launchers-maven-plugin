@@ -14,11 +14,50 @@
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.deploy.skip>true</maven.deploy.skip>
+        <native.os>${os.name}</native.os>
+        <native.arch>${os.arch}</native.arch>
     </properties>
 
     <modules>
         <module>native-launchers-maven-plugin</module>
         <module>sample-cli</module>
     </modules>
+
+    <profiles>
+        <profile>
+            <id>platform-windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <native.os>windows</native.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>platform-osx</id>
+            <activation>
+                <os>
+                    <name>mac os x</name>
+                </os>
+            </activation>
+            <properties>
+                <native.os>osx</native.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>platform-linux</id>
+            <activation>
+                <os>
+                    <name>linux</name>
+                </os>
+            </activation>
+            <properties>
+                <native.os>linux</native.os>
+            </properties>
+        </profile>
+    </profiles>
+
 
 </project>

@@ -16,7 +16,7 @@
         <graalvm.version>22.3.2</graalvm.version>
         <graalvm.tools.version>0.9.21</graalvm.tools.version>
         <imageName>launchers-native-cli</imageName>
-        <outputDir>${project.build.directory}/image</outputDir>
+        <outputDir>${project.build.directory}/image/${native.os}-${native.arch}</outputDir>
         <sharedLibrary>true</sharedLibrary>
         <skipNativeBuild>false</skipNativeBuild>
     </properties>
@@ -35,6 +35,31 @@
             <id>native</id>
             <build>
                 <plugins>
+
+                    <!-- compile native library -->
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>${graalvm.tools.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <outputDirectory>${outputDir}</outputDirectory>
+                            <imageName>${imageName}</imageName>
+                            <sharedLibrary>${sharedLibrary}</sharedLibrary>
+                            <skip>${skipNativeBuild}</skip>
+                            <useArgFile>false</useArgFile>
+                            <skipNativeTests>true</skipNativeTests>
+                            <verbose>true</verbose>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
 
                     <!-- create stubs and compile wrapper executables -->
                     <plugin>
@@ -66,31 +91,6 @@
                                 <id>build-executables</id>
                                 <goals>
                                     <goal>build-launchers</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- compile native library -->
-                    <plugin>
-                        <groupId>org.graalvm.buildtools</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
-                        <version>${graalvm.tools.version}</version>
-                        <extensions>true</extensions>
-                        <configuration>
-                            <outputDirectory>${outputDir}</outputDirectory>
-                            <imageName>${imageName}</imageName>
-                            <sharedLibrary>${sharedLibrary}</sharedLibrary>
-                            <skip>${skipNativeBuild}</skip>
-                            <useArgFile>false</useArgFile>
-                            <skipNativeTests>true</skipNativeTests>
-                            <verbose>true</verbose>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>build-native</id>
-                                <goals>
-                                    <goal>compile-no-fork</goal>
                                 </goals>
                             </execution>
                         </executions>

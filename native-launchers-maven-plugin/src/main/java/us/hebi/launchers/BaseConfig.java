@@ -55,7 +55,7 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(property = "launchers.debug", defaultValue = "false")
     protected Boolean debug;
 
-    @Parameter(property = "launchers.timeout", defaultValue = "10")
+    @Parameter(property = "launchers.timeout", defaultValue = "20")
     protected Integer timeout;
 
     @Parameter(property = "launchers.sourceDirectory", required = true,

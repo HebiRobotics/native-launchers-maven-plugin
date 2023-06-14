@@ -176,7 +176,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             if (debug) builder.inheritIO();
             Process process = builder.start();
             if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
-                throw new IOException("Execution timed out");
+                throw new IOException("Execution timed out after " + timeout + " seconds.");
             }
         } catch (InterruptedException interrupted) {
             throw new IOException("Execution interrupted", interrupted);
