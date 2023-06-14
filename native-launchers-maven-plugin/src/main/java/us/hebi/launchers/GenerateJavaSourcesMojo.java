@@ -76,7 +76,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
 
             // Annotation for including the method in the native library
             AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPointClass)
-                    .addMember("name", "$S", launcher.getConventionalName())
+                    .addMember("name", "$S", launcher.getSymbolName())
                     .build();
 
             // Optional debug block
@@ -87,7 +87,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
             }
 
             // Wrapper that forwards to the specified main
-            type.addMethod(MethodSpec.methodBuilder(launcher.getConventionalName())
+            type.addMethod(MethodSpec.methodBuilder(launcher.getSymbolName())
                     .addModifiers(Modifier.STATIC)
                     .addAnnotation(cEntry)
                     .returns(int.class)
@@ -112,7 +112,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
                 .addParameter(CCharPointerPointerClass, "argv", Modifier.FINAL)
                 .returns(String[].class)
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
-                .addComment("C adds the executable name as the first argument")
+                .addComment("Java omits the name of the program argv[0]")
                 .addStatement("String[] args = new String[argc - 1]")
                 .beginControlFlow(" for (int i = 0; i < args.length; i++)")
                 .addStatement("args[i] = $T.toJavaString(argv.addressOf(i + 1).read())", CTypeConversionClass)
@@ -136,7 +136,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
         for (Launcher launcher : launchers) {
             out.append("\n ");
             appendSpaced(out, launcher.getMainClass(), columnWidth);
-            out.append(" (").append(launcher.getConventionalName()).append(")");
+            out.append(" (").append(launcher.getSymbolName()).append(")");
         }
         return out;
     }

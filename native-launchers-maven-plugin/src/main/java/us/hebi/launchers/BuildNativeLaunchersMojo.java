@@ -31,10 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static us.hebi.launchers.Utils.*;
@@ -59,7 +56,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             printDebug("Generating C sources in " + sourceDir);
             for (Launcher launcher : launchers) {
                 String imgName = getNonNull(launcher.imageName, imageName);
-                String sourceCode = fillTemplate(template, imgName, launcher.getConventionalName());
+                String sourceCode = fillTemplate(template, imgName, launcher.getSymbolName());
                 writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
                 printDebug("Generated source file: " + launcher.getCFileName());
             }
@@ -106,6 +103,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         if (debug) processArgs.add("-DDEBUG");
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
+        processArgs.addAll(getDefaultLoadingPathOptions());
         runProcess(srcDir, processArgs);
 
         // Disable the console window for non-console apps
@@ -178,10 +176,33 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             if (debug) builder.inheritIO();
             Process process = builder.start();
             if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
-                throw new IOException("Execution timed out");
+                throw new IOException("Execution timed out after " + timeout + " seconds.");
             }
         } catch (InterruptedException interrupted) {
             throw new IOException("Execution interrupted", interrupted);
+        }
+    }
+
+    /**
+     * Where the library can be found relative to the executable:
+     * Default to same directory and Conveyor-like app package layouts
+     */
+    static List<String> getDefaultLoadingPathOptions() {
+        if (isWindows()) {
+            return Collections.emptyList();
+        } else if (isMac()) {
+            return Arrays.asList(
+                    "-Wl,-rpath,@loader_path",
+                    "-Wl,-rpath,@loader_path/../Frameworks",
+                    "-Wl,-rpath,@loader_path/../runtime/Contents/Home/lib",
+                    "-Wl,-rpath,@loader_path/../runtime/Contents/Home/lib/server"
+            );
+        } else {
+            return Arrays.asList(
+                    "-Wl,-rpath,${ORIGIN}",
+                    "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib",
+                    "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib/server"
+            );
         }
     }
 

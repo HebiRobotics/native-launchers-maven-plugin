@@ -42,6 +42,7 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     protected MavenSession session;
 
+    // default to same as https://github.com/graalvm/native-build-tools/blob/master/native-maven-plugin/src/main/java/org/graalvm/buildtools/maven/AbstractNativeImageMojo.java
     @Parameter(property = "outputDir", defaultValue = "${project.build.directory}", required = true)
     protected String outputDirectory; // default to native-maven-plugin value
 
@@ -54,7 +55,7 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(property = "launchers.debug", defaultValue = "false")
     protected Boolean debug;
 
-    @Parameter(property = "launchers.timeout", defaultValue = "10")
+    @Parameter(property = "launchers.timeout", defaultValue = "20")
     protected Integer timeout;
 
     @Parameter(property = "launchers.sourceDirectory", required = true,
@@ -99,6 +100,9 @@ abstract class BaseConfig extends AbstractMojo {
         protected String imageName;
 
         @Parameter
+        protected String symbolName;
+
+        @Parameter
         protected boolean console = true;
 
         public String getMainClass() {
@@ -113,8 +117,11 @@ abstract class BaseConfig extends AbstractMojo {
             return name + ".c";
         }
 
-        public String getConventionalName() {
-            return "run_" + mainClass.replaceAll("\\.", "_") + "_main";
+        public String getSymbolName() {
+            if(symbolName == null){
+                symbolName = "run_" + mainClass.replaceAll("\\.", "_") + "_main";
+            }
+            return symbolName;
         }
 
     }

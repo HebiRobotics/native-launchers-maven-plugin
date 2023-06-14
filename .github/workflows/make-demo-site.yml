@@ -1,0 +1,40 @@
+name: Make Demo Site
+on:
+  push:
+    branches: [ release/demo-app ]
+  workflow_dispatch:
+    inputs:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-demo-images.yml
+      
+  deploy:
+    needs: build
+    runs-on: macos-aarch64
+    steps:
+      - uses: actions/checkout@v3       
+      
+      - name: Clean workspace
+        run: |
+          rm -rf ./sample-cli/target
+          rm -rf ./output
+      
+      - name: Download native artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: native-launchers-images
+          path: ./sample-cli/target/image
+
+      - name: Set executable bits (not retained by upload action)
+        run: chmod +x ./sample-cli/target/image/*/*
+
+      - name: Build Site
+        run: conveyor make site
+
+      - name: Upload Site
+        uses: actions/upload-artifact@v3
+        with:
+          name: native-launchers-site
+          path: ./output/**
+          retention-days: 10

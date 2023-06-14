@@ -15,9 +15,10 @@
     <properties>
         <graalvm.version>22.3.2</graalvm.version>
         <graalvm.tools.version>0.9.21</graalvm.tools.version>
-        <graalvm.skip>false</graalvm.skip>
-        <graalvm.imageName>cli</graalvm.imageName>
-        <graalvm.imageDir>${project.build.directory}/image</graalvm.imageDir>
+        <imageName>launchers-native-cli</imageName>
+        <outputDir>${project.build.directory}/image/${native.os}-${native.arch}</outputDir>
+        <sharedLibrary>true</sharedLibrary>
+        <skipNativeBuild>false</skipNativeBuild>
     </properties>
 
     <dependencies>
@@ -42,14 +43,13 @@
                         <version>${graalvm.tools.version}</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <outputDirectory>${graalvm.imageDir}</outputDirectory>
-                            <imageName>${graalvm.imageName}</imageName>
-                            <sharedLibrary>true</sharedLibrary>
-                            <skip>${graalvm.skip}</skip>
-                            <verbose>true</verbose>
+                            <outputDirectory>${outputDir}</outputDirectory>
+                            <imageName>${imageName}</imageName>
+                            <sharedLibrary>${sharedLibrary}</sharedLibrary>
+                            <skip>${skipNativeBuild}</skip>
                             <useArgFile>false</useArgFile>
-                            <fallback>false</fallback>
                             <skipNativeTests>true</skipNativeTests>
+                            <verbose>true</verbose>
                         </configuration>
                         <executions>
                             <execution>
@@ -67,15 +67,15 @@
                         <artifactId>native-launchers-maven-plugin</artifactId>
                         <version>1.0-SNAPSHOT</version>
                         <configuration>
-                            <outputDirectory>${graalvm.imageDir}</outputDirectory>
-                            <imageName>${graalvm.imageName}</imageName>
+                            <outputDirectory>${outputDir}</outputDirectory>
+                            <imageName>${imageName}</imageName>
                             <launchers>
                                 <launcher>
-                                    <name>cli-hello</name>
+                                    <name>launchers-hello</name>
                                     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
                                 </launcher>
                                 <launcher>
-                                    <name>cli-dir</name>
+                                    <name>launchers-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
                                 </launcher>
                             </launchers>

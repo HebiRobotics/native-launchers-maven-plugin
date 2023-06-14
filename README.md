@@ -1,40 +1,66 @@
 # Native Launchers Maven Plugin
 
-This plugin creates thin native launchers so that one [native shared library](https://www.graalvm.org/22.2/reference-manual/native-image/guides/build-native-shared-library/) can be shared between multiple main methods. This significantly reduces the deployment size of suite of apps (e.g. CLI tools) that want to make use of [GraalVM](https://www.graalvm.org/)'s native-image.
+This plugin creates thin native launchers so that a single [native shared library](https://github.com/oracle/graal/blob/release/graal-vm/22.3/docs/reference-manual/native-image/InteropWithNativeCode.md) can be shared between multiple main methods. This significantly reduces the deployment size of multi-app bundles (e.g. CLI tools) that want to make use of [GraalVM](https://www.graalvm.org/)'s native-image.
 
-It roughly works as follows:
-* A Java file with appropriate `@CEntryPoint` methods is generated during the `generate-sources` stage
-* The Java file gets included in the native-image compilation and includes matching symbols
-* A tiny native executable loads the library and calls the native entry point
+## How does it work?
 
-The launchers use dynamic linking and have no external dependencies, so they can be built at any time and without requiring the native library or headers. A hello world app with debug info enabled prints the following
+The plugin specifies the name of the executable and the corresponding Java method, e.g.,
+
+```xml
+<launcher>
+    <name>hello</name> <!-- name of the executable -->
+    <mainClass>us.hebi.samples.cli.HelloWorld</mainClass> <!-- mapped Java main method -->
+</launcher>
+```
+
+The plugin is then divided into two steps:
+
+1. The `[gen-sources]` step generates a Java file with [@CEntryPoint](https://www.graalvm.org/sdk/javadoc/org/graalvm/nativeimage/c/function/CEntryPoint.html) annotated methods that result in exported symbols in the shared library. The methods handle the translation of C to Java arguments and delegate to the Java main methods. The generated class below would result in a native `int run_us_hebi_samples_cli_HelloWorld_main(graal_isolatethread_t*, int, char**)` method.
+
+```Java
+class NativeLaunchers {
+    
+  @CEntryPoint(name = "run_us_hebi_samples_cli_HelloWorld_main")
+  static int run_us_hebi_samples_cli_HelloWorld_main(IsolateThread thread, int argc,  CCharPointerPointer argv) {
+    try {
+      String[] args = toJavaArgs(argc, argv);
+      HelloWorld.main(args);
+      return 0;
+    } catch (Throwable t) {
+      t.printStackTrace();
+      return -1;
+    }
+  }
+
+  private static String[] toJavaArgs(final int argc, final CCharPointerPointer argv) {
+    // Java omits the name of the program argv[0]
+    String[] args = new String[argc - 1];
+     for (int i = 0; i < args.length; i++) {
+      args[i] = CTypeConversion.toJavaString(argv.addressOf(i + 1).read());
+    }
+    return args;
+  }
+  
+}
+```
+
+2. The `[build-launchers]` step builds tiny launchers that load and call into the shared library. The loading is done dynamically, so there are no compile time dependencies and the launchers can be built independently of the native-image. The template for the native code generation is in [main-dynamic.c](native-launchers-maven-plugin/src/main/resources/us/hebi/launchers/templates/main-dynamic.c).
+
+A hello world app with debug info enabled (`-Dlaunchers.debug`) produces the following printout
 
 ```bash
-bin> cli-hello.exe arg1 arg2
-[DEBUG] Windows
-[DEBUG] load library cli
+bin> hello.exe arg1 arg2
+[DEBUG] Running on (Windows|Linux|macOS)
+[DEBUG] load library native-cli
 [DEBUG] lookup symbol graal_create_isolate
 [DEBUG] lookup symbol run_us_hebi_samples_cli_HelloWorld_main
-[DEBUG] initializing isolate
+[DEBUG] creating isolate thread
 [DEBUG] calling run_us_hebi_samples_cli_HelloWorld_main
 [DEBUG] calling us.hebi.samples.cli.HelloWorld (args: [arg1, arg2])
 Hello world!
 ```
 
-**Things that still need to be figured out**
-* Linux / macOS
-  * **Calling apps from another directory currently fails due to the library not being found (!!!)**. The lib should be loaded relative to the binary rather than the working directory.
-  * Support known relative locations to better support app packages (e.g. macOS bundles)
-* JavaFX
-  * Support JavaFX launchers. The [gluonfx plugin](https://github.com/gluonhq/gluonfx-maven-plugin) added a `sharedlib` target, but for some reason [it does not work with JavaFX code](https://docs.gluonhq.com/#_native_shared_libraries).
-
-**Known issues / limitations**
-* The `@CEntryPoint` annotations require a compile dependency on the graal sdk. Attempts to generate the `.class` file directly ended in errors due to native-image requiring [a matching source file](https://github.com/graalvm/graal-jvmci-8/blob/master/jvmci/jdk.vm.ci.meta/src/jdk/vm/ci/meta/ResolvedJavaType.java#L315-L318).
-* Each platform needs to be compiled individually like the Graal native-image. Static linking requires an existing native-image, and dynamic linking is not supported when cross-compiling (at least on [zig 0.10.1](https://ziglang.org/download/0.10.1/release-notes.html)).
-
-## Usage
-
-**Warning: Version 0.1 is in a proof-of-concept state. Given the path loading issue on macOS and Linux it's best to consider it Windows-only.** 
+## Maven Instructions
 
 1. add the compilation dependency for the generated graal annotations
 ```xml
@@ -54,7 +80,7 @@ Hello world!
     <artifactId>native-launchers-maven-plugin</artifactId>
     <version>0.1</version>
     <configuration>
-        <outputDirectory>${graalvm.imageDir}</outputDirectory>
+        <outputDirectory>${graalvm.outputDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>
         <launchers>
             <launcher>
@@ -68,13 +94,13 @@ Hello world!
         </launchers>
     </configuration>
     <executions>
-        <execution> <!-- before compilation and native-image -->
+        <execution> <!-- generate Java sources (before compilation) -->
             <id>generate-stubs</id>
             <goals>
                 <goal>gen-sources</goal>
             </goals>
         </execution>
-        <execution> <!-- at any time, defaults to the packaging phase -->
+        <execution> <!-- build launchers -->
             <id>build-executables</id>
             <goals>
                 <goal>build-launchers</goal>
@@ -93,14 +119,13 @@ Hello world!
     <version>${graalvm.tools.version}</version>
     <extensions>true</extensions>
     <configuration>
-        <outputDirectory>${graalvm.imageDir}</outputDirectory>
-        <imageName>${graalvm.imageName}</imageName>
+        <outputDirectory>${outputDir}</outputDirectory>
+        <imageName>${imageName}</imageName>
         <sharedLibrary>true</sharedLibrary>
-        <skip>${graalvm.skip}</skip>
-        <verbose>true</verbose>
+        <skip>${skipNativeBuild}</skip>
         <useArgFile>false</useArgFile>
-        <fallback>false</fallback>
         <skipNativeTests>true</skipNativeTests>
+        <verbose>true</verbose>
     </configuration>
     <executions>
         <execution>
@@ -113,16 +138,23 @@ Hello world!
 </plugin>
 ```
 
-## Build
+## Building the source
 
 ```bash
-# everything including native image and native launchers
+# build everything including native image and native launchers
 mvn package -Pnative
 
 # generate launchers, but skip native image
 mvn package -Pnative -Dgraalvm.skip
 
-# sample project with native image and additional debug info
+# build the sample project with the native image and additional debug info
 mvn package -Pnative --projects sample-cli -am -Dlaunchers.debug
 ```
 
+
+## Known limitations
+* The `@CEntryPoint` annotations require a compile dependency on the graal sdk. Attempts to generate the `.class` file directly ended in errors due to native-image requiring [a matching source file](https://github.com/graalvm/graal-jvmci-8/blob/master/jvmci/jdk.vm.ci.meta/src/jdk/vm/ci/meta/ResolvedJavaType.java#L315-L318).
+* Each platform needs to be compiled individually like the Graal native-image. Static linking requires an existing native-image, and dynamic linking is not supported when cross-compiling (tested with [zig 0.10.1](https://ziglang.org/download/0.10.1/release-notes.html)).
+
+## Future goals
+* Support JavaFX launchers. The [gluonfx plugin](https://github.com/gluonhq/gluonfx-maven-plugin) added a `sharedlib` target, but it currently [does not work with JavaFX code](https://docs.gluonhq.com/#_native_shared_libraries).
