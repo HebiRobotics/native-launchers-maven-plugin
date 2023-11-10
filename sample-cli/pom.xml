@@ -19,14 +19,40 @@
         <outputDir>${project.build.directory}/image/${native.os}-${native.arch}</outputDir>
         <sharedLibrary>true</sharedLibrary>
         <skipNativeBuild>false</skipNativeBuild>
+        <javafx.version>21</javafx.version>
+        <javafx.scope>provided</javafx.scope>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.graalvm.nativeimage</groupId>
             <artifactId>native-image-base</artifactId>
-            <version>22.3.2</version>
+            <version>23.1.1</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
         </dependency>
     </dependencies>
 
@@ -77,6 +103,15 @@
                                 <launcher>
                                     <name>launcher-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-gui</name>
+                                    <mainClass>us.hebi.samples.gui.GuiApp</mainClass>
+                                    <console>false</console>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-gui-verbose</name>
+                                    <mainClass>us.hebi.samples.gui.GuiAppVerbose</mainClass>
                                 </launcher>
                             </launchers>
                         </configuration>
