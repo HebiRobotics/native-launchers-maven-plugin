@@ -153,10 +153,12 @@ mvn package -Pnative -Dgraalvm.skip
 mvn package -Pnative --projects sample-cli -am -Dlaunchers.debug
 ```
 
+## JavaFX Applications
+
+JavaFX Applications work when using [bellsoft's Liberica Native Image Kit](https://bell-sw.com/liberica-native-image-kit/) distribution of GraalVM. The samples were tested on Windows with NIK23 (JDK21) - Full.
+
+Most applications will likely need to run the tracing agent to determine used resources and reflectively accessed classes. It can be enabled by running the application with the vm option `-agentlib:native-image-agent=config-output-dir=sample-cli/src/main/resources/META-INF/native-image` and exploring all code paths at least once.
 
 ## Known limitations
 * The `@CEntryPoint` annotations require a compile dependency on the graal sdk. Attempts to generate the `.class` file directly ended in errors due to native-image requiring [a matching source file](https://github.com/graalvm/graal-jvmci-8/blob/master/jvmci/jdk.vm.ci.meta/src/jdk/vm/ci/meta/ResolvedJavaType.java#L315-L318).
 * Each platform needs to be compiled individually like the Graal native-image. Static linking requires an existing native-image, and dynamic linking is not supported when cross-compiling (tested with [zig 0.10.1](https://ziglang.org/download/0.10.1/release-notes.html)).
-
-## Future goals
-* Support JavaFX launchers. The [gluonfx plugin](https://github.com/gluonhq/gluonfx-maven-plugin) added a `sharedlib` target, but it currently [does not work with JavaFX code](https://docs.gluonhq.com/#_native_shared_libraries).
