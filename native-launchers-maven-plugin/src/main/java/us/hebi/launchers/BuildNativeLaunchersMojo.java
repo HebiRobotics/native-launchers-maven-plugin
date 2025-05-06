@@ -24,6 +24,9 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.codehaus.plexus.util.cli.CommandLineException;
+import org.codehaus.plexus.util.cli.CommandLineUtils;
+import org.codehaus.plexus.util.cli.Commandline;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -32,7 +35,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static us.hebi.launchers.Utils.*;
 
@@ -40,7 +42,7 @@ import static us.hebi.launchers.Utils.*;
  * @author Florian Enner
  * @since 09 Jun 2023
  */
-@Mojo(name = "build-launchers", defaultPhase = LifecyclePhase.PACKAGE)
+@Mojo(name = "build-launchers", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class BuildNativeLaunchersMojo extends BaseConfig {
 
     @Override
@@ -54,11 +56,21 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             Path sourceDir = getGeneratedCSourceDir();
             Files.createDirectories(sourceDir);
             printDebug("Generating C sources in " + sourceDir);
+            boolean hasOnlyConsoleLaunchers = true;
             for (Launcher launcher : launchers) {
+                hasOnlyConsoleLaunchers &= launcher.console;
                 String imgName = getNonNull(launcher.imageName, imageName);
                 String sourceCode = fillTemplate(template, imgName, launcher.getSymbolName());
                 writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
                 printDebug("Generated source file: " + launcher.getCFileName());
+            }
+
+            // Add optional Cocoa launcher
+            if (isMac() && !hasOnlyConsoleLaunchers) {
+                writeToDisk(
+                        loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/AppDelegate.m"),
+                        sourceDir, "AppDelegate.m");
+                printDebug("Copied source file: AppDelegate.m");
             }
 
             // Build the executables
@@ -68,6 +80,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
 
                 // Compile source
                 String outputName = launcher.name + (isWindows() ? ".exe" : "");
+                getLog().info("Compiling " + launcher.getCFileName());
                 Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console);
 
                 // Move result to the desired output directory
@@ -93,13 +106,19 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 .replaceAll("\\{\\{METHOD_NAME}}", methodName);
     }
 
-    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws IOException {
+    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws MojoExecutionException {
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
         processArgs.addAll(compilerArgs);
         processArgs.add("-o");
         processArgs.add(outputName);
         processArgs.add(srcFileName);
+        if (!console && isMac()) {
+            processArgs.add("AppDelegate.m");
+            processArgs.add("-framework");
+            processArgs.add("Cocoa");
+        }
+        if (console) processArgs.add("-DCONSOLE");
         if (debug) processArgs.add("-DDEBUG");
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
@@ -117,24 +136,19 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
     }
 
     private List<String> getCompiler() throws FileNotFoundException {
-        List<String> compilerArgs = new ArrayList<>();
-        if (compiler != null) {
-            // User-specified compiler
-            compilerArgs.addAll(compiler);
-        } else {
-            // Look through PATH for various candidates
-            List<String> candidates = isWindows()
-                    ? Arrays.asList("cl.exe", "zig.exe")
-                    : Arrays.asList("cc", "gcc", "clang", "zig", getBuiltinClang());
-            compilerArgs.add(findCompilerOnPath(candidates));
+        // Note: we could compile the native launchers with various compilers, but
+        // due to some limitations regarding dynamic loading of libraries (zig doesn't
+        // support it for non-native platforms) and compiling objc code for GUI applications
+        // on macOS, we stick to the compilers officially supported by GraalVM. Non-standard
+        // options can be chosen manually via the compiler args.
+        if (compiler != null && !compiler.isEmpty()) return new ArrayList<>(compiler);
+        return Collections.singletonList(getGraalDefaultCompiler());
+    }
 
-            // Note: zig cc works for the host target, but the
-            // cross-compilation breaks dynamic loading.
-            if (compilerArgs.get(0).startsWith("zig")) {
-                compilerArgs.add("cc");
-            }
-        }
-        return compilerArgs;
+    private static String getGraalDefaultCompiler() {
+        if (isWindows()) return "cl.exe";
+        if (isMac()) return "cc";
+        return "gcc";
     }
 
     private String findCompilerOnPath(List<String> candidates) throws FileNotFoundException {
@@ -164,22 +178,24 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 .orElse("");
     }
 
-    private void runProcess(Path directory, String... args) throws IOException {
+    private void runProcess(Path directory, String... args) throws MojoExecutionException {
         runProcess(directory, Arrays.asList(args));
     }
 
-    private void runProcess(Path directory, List<String> args) throws IOException {
+    private void runProcess(Path directory, List<String> args) throws MojoExecutionException {
         try {
             printDebug(String.join(" ", args));
-            ProcessBuilder builder = new ProcessBuilder(args)
-                    .directory(directory.toFile());
-            if (debug) builder.inheritIO();
-            Process process = builder.start();
-            if (!process.waitFor(timeout, TimeUnit.SECONDS)) {
-                throw new IOException("Execution timed out after " + timeout + " seconds.");
+            Commandline cli = new Commandline();
+            cli.setWorkingDirectory(directory.toFile());
+            cli.addArguments(args.toArray(new String[0]));
+            int returnCode = CommandLineUtils.executeCommandLine(cli,
+                    System.out::println,
+                    System.err::println);
+            if (returnCode != 0) {
+                throw new MojoExecutionException("Compiler returned error code " + returnCode + ". Args:\n" + String.join(" ", args));
             }
-        } catch (InterruptedException interrupted) {
-            throw new IOException("Execution interrupted", interrupted);
+        } catch (CommandLineException ex) {
+            throw new MojoExecutionException(ex);
         }
     }
 

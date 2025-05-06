@@ -112,6 +112,7 @@
                                 <launcher>
                                     <name>launcher-gui-verbose</name>
                                     <mainClass>us.hebi.samples.gui.GuiAppVerbose</mainClass>
+                                    <console>false</console>
                                 </launcher>
                             </launchers>
                         </configuration>

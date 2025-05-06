@@ -103,7 +103,7 @@ void* checkNotNull(void* handle){
 }
 
 // Main entry point
-int main(int argc, char** argv){
+int main_entry_point(int argc, char** argv) {
     PRINT_DEBUG("Running on "OS_FAMILY);
 
     // Dynamically bind to library
@@ -132,3 +132,18 @@ int main(int argc, char** argv){
     PRINT_DEBUG("calling {{METHOD_NAME}}");
     return run_main(thread, argc, argv);
 }
+
+// Logic to handle macOS specifics where the Cocoa/UI loop needs to take over the
+// main thread and the actual main method needs to be launched in the background
+#if defined(__APPLE__) && !defined(CONSOLE)
+typedef int (*main_callback_t)(int argc, char **argv);
+extern void launchCocoa(int argc, char** argv, main_callback_t callback);
+int main(int argc, char** argv) {
+    PRINT_DEBUG("Launching Cocoa framework");
+    launchCocoa(argc, argv, main_entry_point);
+}
+#else
+int main(int argc, char** argv) {
+    return main_entry_point(argc, argv);
+}
+#endif
