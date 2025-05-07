@@ -110,8 +110,12 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
         processArgs.addAll(compilerArgs);
-        processArgs.add("-o");
-        processArgs.add(outputName);
+        if (isWindows()) {
+            processArgs.add("/Fe" + outputName);
+        } else {
+            processArgs.add("-o");
+            processArgs.add(outputName);
+        }
         processArgs.add(srcFileName);
         if (!console && isMac()) {
             processArgs.add("AppDelegate.m");

@@ -12,6 +12,7 @@ The plugin specifies the name of the executable and the corresponding Java metho
 <launcher>
     <name>hello</name> <!-- name of the executable -->
     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass> <!-- mapped Java main method -->
+    <console>true</console> <!-- false for UI apps -->
 </launcher>
 ```
 
