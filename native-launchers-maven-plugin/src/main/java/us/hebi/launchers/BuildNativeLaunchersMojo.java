@@ -127,6 +127,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
         processArgs.addAll(getDefaultLoadingPathOptions());
+        processArgs.addAll(getConveyorOptions());
         runProcess(srcDir, processArgs);
 
         // Disable the console window for non-console apps
@@ -186,8 +187,9 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         runProcess(directory, Arrays.asList(args));
     }
 
-    private void runProcess(Path directory, List<String> args) throws MojoExecutionException {
+    private void runProcess(Path directory, List<String> rawArgs) throws MojoExecutionException {
         try {
+            List<String> args = escapeArgs(rawArgs);
             printDebug(String.join(" ", args));
             Commandline cli = new Commandline();
             cli.setWorkingDirectory(directory.toFile());
@@ -201,6 +203,24 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         } catch (CommandLineException ex) {
             throw new MojoExecutionException(ex);
         }
+    }
+
+    private static List<String> escapeArgs(List<String> args) {
+        if (!isWindows()) {
+            return args;
+        }
+
+        // Powershell has issues with -D arguments, e.g., -DCONSOLE,
+        // but always adding quotes breaks linux and macOS.
+        List<String> escaped = new ArrayList<>(args.size());
+        for (String arg : args) {
+            if (arg.startsWith("-D")) {
+                escaped.add("\"" + arg + "\"");
+            } else {
+                escaped.add(arg);
+            }
+        }
+        return escaped;
     }
 
     /**
@@ -226,6 +246,20 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                     "-Wl,-rpath,${ORIGIN}/../lib/runtime/lib/server"
             );
         }
+    }
+
+    static List<String> getConveyorOptions() {
+        if (isMac()) {
+            // On macOS Conveyor will inject its own library into the binary to initialize
+            // the update system. This ensures that is sufficient empty space in the headers
+            // to make this possible.
+            // see https://conveyor.hydraulic.dev/15.1/configs/native-apps/#building-compatible-binaries
+            return Arrays.asList(
+                    "-Wl,-rpath,@executable_path/../Frameworks",
+                    "-Wl,-headerpad,0xFF"
+            );
+        }
+        return Collections.emptyList();
     }
 
 }

@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  native-image:
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-2022, macos-13, macos-14] # macos13 is Intel, 14 is Arm
