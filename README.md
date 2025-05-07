@@ -81,7 +81,7 @@ Hello world!
 <plugin>
     <groupId>us.hebi.launchers</groupId>
     <artifactId>native-launchers-maven-plugin</artifactId>
-    <version>0.2</version>
+    <version>0.3</version>
     <configuration>
         <outputDirectory>${graalvm.outputDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>
