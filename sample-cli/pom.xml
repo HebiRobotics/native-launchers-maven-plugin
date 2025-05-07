@@ -7,7 +7,7 @@
     <parent>
         <groupId>us.hebi.launchers.samples</groupId>
         <artifactId>parent</artifactId>
-        <version>0.3</version>
+        <version>1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>sample-cli</artifactId>
@@ -91,7 +91,7 @@
                     <plugin>
                         <groupId>us.hebi.launchers</groupId>
                         <artifactId>native-launchers-maven-plugin</artifactId>
-                        <version>0.3</version>
+                        <version>1.0-SNAPSHOT</version>
                         <configuration>
                             <outputDirectory>${outputDir}</outputDirectory>
                             <imageName>${imageName}</imageName>
