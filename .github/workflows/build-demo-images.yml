@@ -3,28 +3,43 @@ name: Build Demo Images
 on: [ workflow_dispatch, workflow_call ]
 
 jobs:
-  build-amd64:
+  native-image:
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-11]
-    runs-on: ${{ matrix.os }}
+        include:
+          - runner: ubuntu-22.04
+            gc: parallel
+          - runner: macos-13 # Intel
+            gc: parallel
+          - runner: macos-14 # Apple M3
+            gc: parallel
+          - runner: windows-2022
+            gc: serial # parallel became stable at >= 24, but that doesn't work with JavaFX
+
+    runs-on: ${{ matrix.runner }}
     continue-on-error: true
     
     steps:
+    - uses: ilammy/msvc-dev-cmd@v1
     - uses: actions/checkout@v3
     - uses: stCarolas/setup-maven@v4.5
       with:
         maven-version: 3.9.1
-        
+
+    - name: 'Install Linux dependencies for JavaFX'
+      if: startsWith(matrix.runner, 'ubuntu')
+      run: |
+        sudo apt-get update && sudo apt-get install -y libxtst-dev libharfbuzz-dev libgtk-3-dev libgdk-pixbuf2.0-dev libpango1.0-dev libcairo2-dev libatk1.0-dev libgl1-mesa-dev zlib1g-dev
+
     - uses: graalvm/setup-graalvm@v1
       with:
-        version: 'latest'
-        java-version: '17'
+        distribution: 'liberica'
+        java-package: 'jdk+fx'
+        java-version: '21'
         set-java-home: 'true'
-        components: 'native-image'
+        native-image-job-reports: 'true'
         cache: 'maven'
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        native-image-job-reports: 'true'
         
     - name: Show versions
       run: |
@@ -34,33 +49,11 @@ jobs:
           native-image --version
           
     - name: Build native image and launchers
-      run: mvn package -Pnative
+      run: mvn package -Pnative "-Dgraalvm.gc=${{ matrix.gc }}"
       
     - name: Upload native images
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: native-launchers-images
+        name: native-launchers-${{ matrix.runner }}
         path: sample-cli/target/image/**
         retention-days: 10
-
-  build-macos-aarch64:
-    runs-on: [self-hosted, macos-aarch64]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3        
-
-      - uses: stCarolas/setup-maven@v4.5
-        with:
-          maven-version: 3.9.1
-          
-      - name: Build macos-aarch64 image
-        run: |
-          export JAVA_HOME=${GRAALVM_HOME}
-          mvn clean package -Pnative
-          
-      - name: Upload native image
-        uses: actions/upload-artifact@v3
-        with:
-          name: native-launchers-images
-          path: sample-cli/target/image/**
-          retention-days: 10

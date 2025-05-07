@@ -11,7 +11,7 @@ jobs:
       
   deploy:
     needs: build
-    runs-on: macos-aarch64
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3       
       
@@ -21,19 +21,34 @@ jobs:
           rm -rf ./output
       
       - name: Download native artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: native-launchers-images
+          pattern: native-launchers-*
+          merge-multiple: true
           path: ./sample-cli/target/image
 
       - name: Set executable bits (not retained by upload action)
         run: chmod +x ./sample-cli/target/image/*/*
 
       - name: Build Site
-        run: conveyor make site
+        uses: hydraulic-software/conveyor/actions/build@v18.0
+        env:
+          SIGNING_KEY: ${{secrets.CONVEYOR_SIGNING_KEY}}
+        with:
+          agree_to_license: 1
+          signing_key: ${{secrets.CONVEYOR_SIGNING_KEY}}
+          extra_flags: '--logs-dir ./conveyor-logs --cache-limit=2.0'
+          command: 'make site'
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conveyor-logs
+          path: ./conveyor-logs
 
       - name: Upload Site
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: native-launchers-site
           path: ./output/**

@@ -15,6 +15,7 @@
     <properties>
         <graalvm.version>22.3.2</graalvm.version>
         <graalvm.tools.version>0.9.21</graalvm.tools.version>
+        <graalvm.gc>serial</graalvm.gc>
         <imageName>launchers-native-cli</imageName>
         <outputDir>${project.build.directory}/image/${native.os}-${native.arch}</outputDir>
         <sharedLibrary>true</sharedLibrary>
@@ -76,6 +77,9 @@
                             <useArgFile>false</useArgFile>
                             <skipNativeTests>true</skipNativeTests>
                             <verbose>true</verbose>
+                            <buildArgs>
+                                <arg>--gc=${graalvm.gc}</arg>
+                            </buildArgs>
                         </configuration>
                         <executions>
                             <execution>
