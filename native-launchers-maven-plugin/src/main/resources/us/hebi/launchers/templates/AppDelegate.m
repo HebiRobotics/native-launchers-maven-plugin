@@ -46,15 +46,6 @@ typedef int (*main_callback_t)(int argc, char **argv);
         self.callback(self.argc, self.argv);
     });
 
-    // App setup
-    dispatch_async(dispatch_get_main_queue(), ^{
-        // Regular means it's a normal app that shows up in the dock and can be tabbed
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-
-        // Bring the app to the foreground
-        [NSApp activateIgnoringOtherApps:YES];
-    });
-
 }
 
 - (BOOL) applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {
@@ -63,18 +54,28 @@ typedef int (*main_callback_t)(int argc, char **argv);
 
 @end
 
-void launchCocoa(int argc, char** argv, main_callback_t callback) {
+void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
     NSLog(@"Launching Cocoa framework");
-
     @autoreleasepool {
+
+        // The main method gets called once the framework finished launching
         AppDelegate* delegate = [[AppDelegate alloc] init];
         delegate.argc = argc;
         delegate.argv = argv;
         delegate.callback = callback;
 
+        // Standard app setup
         NSApplication *app = [NSApplication sharedApplication];
         app.delegate = delegate;
 
+        // Regular means it's a normal app that shows up in the dock and can be tabbed
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+        // Bring the app to the foreground
+        [NSApp activateIgnoringOtherApps:YES];
+
+        // Start the Cocoa event loop (must be on the main thread)
         [NSApp run];
     }
+
 }

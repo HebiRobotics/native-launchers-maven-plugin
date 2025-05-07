@@ -137,10 +137,10 @@ int main_entry_point(int argc, char** argv) {
 // main thread and the actual main method needs to be launched in the background
 #if defined(__APPLE__) && !defined(CONSOLE)
 typedef int (*main_callback_t)(int argc, char **argv);
-extern void launchCocoa(int argc, char** argv, main_callback_t callback);
+extern void launchCocoaApp(int argc, char** argv, main_callback_t callback);
 int main(int argc, char** argv) {
     PRINT_DEBUG("Launching Cocoa framework");
-    launchCocoa(argc, argv, main_entry_point);
+    launchCocoaApp(argc, argv, main_entry_point);
 }
 #else
 int main(int argc, char** argv) {
