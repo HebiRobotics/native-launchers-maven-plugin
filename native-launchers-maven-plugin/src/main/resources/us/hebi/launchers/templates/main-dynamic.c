@@ -106,6 +106,19 @@ void* checkNotNull(void* handle){
 int main_entry_point(int argc, char** argv) {
     PRINT_DEBUG("Running on "OS_FAMILY);
 
+#ifdef _WIN64
+
+    // Set the Console Code Pages to UTF-8 (65001)
+    if (GetConsoleOutputCP() != 0) {  // Check if we have a console
+        //PRINT_DEBUG("Test string (printf): Ελληνικά, Español, Русский, English");
+        PRINT_DEBUG("Setting console output to UTF-8");
+        SetConsoleOutputCP(65001);
+        SetConsoleCP(65001);
+        //PRINT_DEBUG("Test string (printf): Ελληνικά, Español, Русский, English");
+    }
+
+#endif
+
     // Dynamically bind to library
     PRINT_DEBUG("load library {{IMAGE_NAME}}");
     void* handle = dlopen(LIB_FILE, RTLD_LAZY);
