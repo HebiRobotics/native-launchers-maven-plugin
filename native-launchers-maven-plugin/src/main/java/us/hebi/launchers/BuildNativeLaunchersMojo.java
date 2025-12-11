@@ -65,6 +65,9 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 printDebug("Generated source file: " + launcher.getCFileName());
             }
 
+            // Add shared header
+            writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/graal_jni_dynamic.h"), sourceDir, "graal_jni_dynamic.h");
+
             // Add optional Cocoa launcher
             if (isMac() && !hasOnlyConsoleLaunchers) {
                 writeToDisk(

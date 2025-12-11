@@ -28,21 +28,21 @@
  */
 
 // =========== OS-SPECIFIC DEFINITIONS ===========
-#if _WIN64
+#if defined(_WIN32) || defined(_WIN64)
 #ifndef OS_FAMILY
 #define OS_FAMILY "Windows"
 #endif
 #ifndef LIB_FILE
 #define LIB_FILE L"{{IMAGE_NAME}}.dll"
 #endif
-#elif __APPLE__
+#elif defined(__APPLE__)
 #ifndef OS_FAMILY
 #define OS_FAMILY "macOS"
 #endif
 #ifndef LIB_FILE
 #define LIB_FILE "{{IMAGE_NAME}}.dylib"
 #endif
-#elif __linux__
+#elif defined(__linux__)
 #ifndef OS_FAMILY
 #define OS_FAMILY "Linux"
 #endif
@@ -88,14 +88,11 @@ char* dlerror(){
 // =========== MAIN CODE ===========
 // Typedefs for symbol lookup. The threads are just pointers, so we
 // can use void* and get away without including any graalvm headers.
-typedef void graal_isolate_t;
-typedef void graal_isolatethread_t;
-typedef void graal_create_isolate_params_t;
-typedef int(*CreateIsolateMethod)(graal_create_isolate_params_t*, graal_isolate_t**, graal_isolatethread_t**);
-typedef int(*MainMethod)(graal_isolatethread_t*, int, char**);
+#include "graal_jni_dynamic.h"
+typedef int(*MainFunction)(JNIEnv*, int, char**);
 
 void* checkNotNull(void* handle){
-    if(handle == 0){
+    if(handle == 0) {
         PRINT_ERROR(dlerror());
         exit(EXIT_FAILURE);
     }
@@ -124,26 +121,42 @@ int main_entry_point(int argc, char** argv) {
     void* handle = dlopen(LIB_FILE, RTLD_LAZY);
     checkNotNull(handle);
 
-    PRINT_DEBUG("lookup symbol graal_create_isolate");
-    CreateIsolateMethod graal_create_isolate = (CreateIsolateMethod)dlsym(handle, "graal_create_isolate");
-    checkNotNull(graal_create_isolate);
+    PRINT_DEBUG("lookup symbol JNI_CreateJavaVM");
+    CreateJavaVM_Func JNI_CreateJavaVM = (CreateJavaVM_Func)dlsym(handle, "JNI_CreateJavaVM");
+    checkNotNull(JNI_CreateJavaVM);
 
     PRINT_DEBUG("lookup symbol {{METHOD_NAME}}");
-    MainMethod run_main = (MainMethod)dlsym(handle, "{{METHOD_NAME}}");
-    checkNotNull(run_main);
+    MainFunction runMain = (MainFunction)dlsym(handle, "{{METHOD_NAME}}");
+    checkNotNull(runMain);
 
     // Actual main method
-    PRINT_DEBUG("creating isolate thread");
-    graal_isolate_t *isolate = 0;
-    graal_isolatethread_t *thread = 0;
-    if (graal_create_isolate(0, &isolate, &thread) != 0){
-        PRINT_ERROR("initialization error");
-        exit(EXIT_FAILURE);
+    JavaVM *isolate = 0;
+    JNIEnv *thread = 0;
+
+    JavaVMOption options[7];
+    options[0].optionString = "-Dfile.encoding=UTF-8";
+    options[1].optionString = "-Dnative.encoding=UTF-8";
+    options[2].optionString = "-Dstdin.encoding=UTF-8";
+    options[3].optionString = "-Dstdout.encoding=UTF-8";
+    options[4].optionString = "-Dstderr.encoding=UTF-8";
+    options[5].optionString = "-Dstderr.encoding=UTF-8";
+    options[6].optionString = "-Dsun.jnu.encoding=UTF-8";
+
+     JavaVMInitArgs vm_args;
+     vm_args.version = JNI_VERSION_1_8;
+     vm_args.nOptions = 7;
+     vm_args.options = options;
+     vm_args.ignoreUnrecognized = JNI_FALSE;
+
+    // Call JNI_CreateJavaVM, casting the last argument to void*
+    if (JNI_CreateJavaVM(&isolate, &thread, &vm_args) != JNI_OK) {
+        PRINT_ERROR("Failed to create GraalVM isolate");
+        return 1;
     }
 
     // Call into shared lib
     PRINT_DEBUG("calling {{METHOD_NAME}}");
-    return run_main(thread, argc, argv);
+    return runMain(thread, argc, argv);
 }
 
 // Logic to handle macOS specifics where the Cocoa/UI loop needs to take over the
