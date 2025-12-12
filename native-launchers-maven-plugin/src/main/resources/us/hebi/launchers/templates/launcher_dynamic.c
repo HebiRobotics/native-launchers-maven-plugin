@@ -67,7 +67,7 @@ int main_entry_point(int argc, char** argv) {
     if (exePath == NULL) {
         PRINT_ERROR("Could not determine executable path.");
     }
-    char* launcherPath = concat("-Dlauncher.executable=", exePath);
+    char* launcherPath = concat("-Dlauncher.executablePath=", exePath);
     free(exePath);
 
     // Prepare jvm options
@@ -120,7 +120,7 @@ int main_entry_point(int argc, char** argv) {
     // Metadata and user jvm args
     options[nOptions++].optionString = launcherPath;{{JVM_ARGS}}
 
-    PRINT_DEBUG("adding vm options:");
+    PRINT_DEBUG("Adding vm options:");
     for (int i=0; i < nOptions; i++) {
         PRINT_DEBUG(options[i].optionString);
     }
@@ -133,15 +133,15 @@ int main_entry_point(int argc, char** argv) {
     vm_args.ignoreUnrecognized = JNI_FALSE;
 
     // Dynamically bind to library
-    PRINT_DEBUG("load library {{IMAGE_NAME}}");
+    PRINT_DEBUG("Loading library " TOSTRING(LIB_FILE));
     void* handle = dlopen(LIB_FILE, RTLD_LAZY);
     checkNotNull(handle);
 
-    PRINT_DEBUG("lookup symbol JNI_CreateJavaVM");
+    PRINT_DEBUG("Looking up symbol: JNI_CreateJavaVM");
     CreateJavaVM_Func JNI_CreateJavaVM = (CreateJavaVM_Func)dlsym(handle, "JNI_CreateJavaVM");
     checkNotNull(JNI_CreateJavaVM);
 
-    PRINT_DEBUG("lookup symbol {{METHOD_NAME}}");
+    PRINT_DEBUG("Looking up symbol: {{METHOD_NAME}}");
     MainFunction runMain = (MainFunction)dlsym(handle, "{{METHOD_NAME}}");
     checkNotNull(runMain);
 
@@ -155,7 +155,7 @@ int main_entry_point(int argc, char** argv) {
     free(launcherPath);
 
     // Call into shared lib
-    PRINT_DEBUG("calling {{METHOD_NAME}}");
+    PRINT_DEBUG("Calling {{METHOD_NAME}}");
     return runMain(thread, argc, argv);
 }
 
