@@ -75,7 +75,7 @@ int main_entry_point(int argc, char** argv) {
     if (exePath == NULL) {
         PRINT_ERROR("Could not determine executable path.");
     }
-    char* pathProperty = concat("-Dapp.executable=", exePath);
+    char* pathProperty = concat("-Dlauncher.path=", exePath);
     free(exePath);
     PRINT_DEBUG(pathProperty);
 
@@ -98,8 +98,14 @@ int main_entry_point(int argc, char** argv) {
 
     PRINT_DEBUG("setting up vm options");
     int nOptions = 0;
-    JavaVMOption options[10]; // TODO: max options + user options
+    JavaVMOption options[10]; // TODO: max built-in options + user option count
+
+    // Metadata about the launcher
     options[nOptions++].optionString = pathProperty;
+    options[nOptions++].optionString = "-Dlauncher.entrypoint={{METHOD_NAME}}";
+
+    // General options for a good out of the box experience
+    options[nOptions++].optionString = "-Dpicocli.ansi=tty";
     options[nOptions++].optionString = "-Dfile.encoding=UTF-8";
     options[nOptions++].optionString = "-Dnative.encoding=UTF-8";
 
