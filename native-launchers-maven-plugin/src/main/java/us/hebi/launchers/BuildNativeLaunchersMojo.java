@@ -52,7 +52,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         try {
 
             // Generate wrapper sources
-            String template = loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/main-dynamic.c");
+            String template = loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/launcher_dynamic.c");
             Path sourceDir = getGeneratedCSourceDir();
             Files.createDirectories(sourceDir);
             printDebug("Generating C sources in " + sourceDir);
