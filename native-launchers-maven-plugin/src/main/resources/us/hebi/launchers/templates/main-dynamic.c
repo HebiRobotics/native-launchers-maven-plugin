@@ -79,19 +79,6 @@ int main_entry_point(int argc, char** argv) {
     free(exePath);
     PRINT_DEBUG(pathProperty);
 
-#ifdef _WIN64
-
-    // Set the Console Code Pages to UTF-8 (65001)
-    if (GetConsoleOutputCP() != 0) {  // Check if we have a console
-        //PRINT_DEBUG("Test string (printf): Ελληνικά, Español, Русский, English");
-        PRINT_DEBUG("Setting console output to UTF-8");
-        SetConsoleOutputCP(65001);
-        SetConsoleCP(65001);
-        //PRINT_DEBUG("Test string (printf): Ελληνικά, Español, Русский, English");
-    }
-
-#endif
-
     // Dynamically bind to library
     PRINT_DEBUG("load library {{IMAGE_NAME}}");
     void* handle = dlopen(LIB_FILE, RTLD_LAZY);
@@ -109,25 +96,39 @@ int main_entry_point(int argc, char** argv) {
     JavaVM *isolate = 0;
     JNIEnv *thread = 0;
 
-    JavaVMOption options[8];
-    options[0].optionString = pathProperty;
-    options[1].optionString = "-Dfile.encoding=UTF-8";
-    options[2].optionString = "-Dnative.encoding=UTF-8";
-    options[3].optionString = "-Dstdin.encoding=UTF-8";
-    options[4].optionString = "-Dstdout.encoding=UTF-8";
-    options[5].optionString = "-Dstderr.encoding=UTF-8";
-    options[6].optionString = "-Dstderr.encoding=UTF-8";
-    options[7].optionString = "-Dsun.jnu.encoding=UTF-8";
+    PRINT_DEBUG("setting up vm options");
+    int nOptions = 0;
+    JavaVMOption options[10]; // TODO: max options + user options
+    options[nOptions++].optionString = pathProperty;
+    options[nOptions++].optionString = "-Dfile.encoding=UTF-8";
+    options[nOptions++].optionString = "-Dnative.encoding=UTF-8";
+
+    #if defined(_WIN32) || defined(_WIN64)
+
+        // Set the Console Code Pages to UTF-8 (65001)
+        if (GetConsoleOutputCP() != 0) {  // Check if we have a console
+            SetConsoleOutputCP(65001);
+            SetConsoleCP(65001);
+            PRINT_DEBUG("Set console output to UTF-8 (check: Æøåæøå)");
+        }
+
+        // Make Java aware that streams are UTF-8
+        options[nOptions++].optionString = "-Dsun.jnu.encoding=UTF-8";
+        options[nOptions++].optionString = "-Dstdin.encoding=UTF-8";
+        options[nOptions++].optionString = "-Dstdout.encoding=UTF-8";
+        options[nOptions++].optionString = "-Dstderr.encoding=UTF-8";
+
+    #endif
 
      JavaVMInitArgs vm_args;
      vm_args.version = JNI_VERSION_1_8;
-     vm_args.nOptions = 8;
+     vm_args.nOptions = nOptions;
      vm_args.options = options;
      vm_args.ignoreUnrecognized = JNI_FALSE;
 
     // Call JNI_CreateJavaVM, casting the last argument to void*
     if (JNI_CreateJavaVM(&isolate, &thread, &vm_args) != JNI_OK) {
-        PRINT_ERROR("Failed to create GraalVM isolate");
+        PRINT_ERROR("Failed to create JavaVM (GraalVM isolate)");
         return 1;
     }
     free(pathProperty);
