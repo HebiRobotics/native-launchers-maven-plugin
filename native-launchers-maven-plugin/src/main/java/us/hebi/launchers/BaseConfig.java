@@ -105,6 +105,10 @@ abstract class BaseConfig extends AbstractMojo {
         @Parameter
         protected String symbolName;
 
+        // Unique user model ID for consistent taskbar behavior in Windows
+        @Parameter
+        protected String userModelId;
+
         @Parameter
         protected boolean console = true;
 

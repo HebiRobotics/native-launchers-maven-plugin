@@ -56,14 +56,6 @@
 #include "launcher_utils.h"
 typedef int(*MainFunction)(JNIEnv*, int, char**);
 
-void* checkNotNull(void* handle){
-    if(handle == 0) {
-        PRINT_ERROR(dlerror());
-        exit(EXIT_FAILURE);
-    }
-    return handle;
-}
-
 // Main entry point
 int main_entry_point(int argc, char** argv) {
     PRINT_DEBUG("Running on "OS_FAMILY);
@@ -109,6 +101,19 @@ int main_entry_point(int argc, char** argv) {
         // seem to be a way to fix that from the application side.
         options[nOptions++].optionString = "-Dstdout.encoding=UTF-8";
         options[nOptions++].optionString = "-Dstderr.encoding=UTF-8";
+
+        #ifdef AUMID
+        // Define the AUMID as a wide character string literal (required by Windows API)
+        // This makes the taskbar icons be consistent, e.g., launching the app does not show two icons
+        const wchar_t* app_aumid = L"" TOSTRING(AUMID);
+
+        HRESULT hr = SetCurrentProcessExplicitAppUserModelID(app_aumid);
+        if (SUCCEEDED(hr)) {
+            PRINT_DEBUG("Set Application User Model Id: " TOSTRING(AUMID));
+        } else {
+            PRINT_ERROR("Failed to set Application User Model Id)");
+        }
+        #endif
 
     #endif
 

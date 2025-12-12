@@ -33,6 +33,9 @@
 #endif
 #define PRINT_ERROR(message) fprintf(stderr, "[ERROR] %s\n", message)
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 // =========== DEPENDENCIES FOR DLOPEN API ===========
 #if defined(_WIN32) || defined(_WIN64)
 
@@ -40,6 +43,11 @@
     #include <windows.h>
     #include <stdio.h>
     #define RTLD_LAZY 0 // TODO: are there flags we should add?
+
+    #ifdef AUMID
+    #include <shlobj.h>  // Contains the declaration for SetCurrentProcessExplicitAppUserModelID
+    #include <wchar.h>   // For wide characters (L"...")
+    #endif
 
     #ifdef __cplusplus
     extern "C" {
@@ -68,6 +76,22 @@
     #include <stdlib.h>
     #include <stdio.h>
     #include <dlfcn.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+static inline void* checkNotNull(void* handle){
+    if(handle == 0) {
+        PRINT_ERROR(dlerror());
+        exit(EXIT_FAILURE);
+    }
+    return handle;
+}
+
+#ifdef __cplusplus
+}
 #endif
 
 // =========== API for getting the executable path ===========

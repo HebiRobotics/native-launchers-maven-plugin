@@ -84,7 +84,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 // Compile source
                 String outputName = launcher.name + (isWindows() ? ".exe" : "");
                 getLog().info("Compiling " + launcher.getCFileName());
-                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console);
+                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console, launcher.userModelId);
 
                 // Move result to the desired output directory
                 Path outputDir = Paths.get(getNonNull(launcher.outputDirectory, outputDirectory));
@@ -108,11 +108,16 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         String entrypoint = launcher.getSymbolName();
 
         List<String> jvmArgs = new ArrayList<>();
-        if (debug) jvmArgs.add("-Dlauncher.debug=true");
         jvmArgs.add("-Dlauncher.mainClass=" + launcher.mainClass);
         jvmArgs.add("-Dlauncher.displayName=" + launcher.name);
         jvmArgs.add("-Dlauncher.imageName=" + imageName);
         jvmArgs.add("-Dlauncher.nativeMethod=" + entrypoint);
+        if (!Utils.isNullOrEmpty(launcher.userModelId)) {
+            jvmArgs.add("-Dlauncher.userModelId=" + launcher.userModelId);
+        }
+        if (debug) {
+            jvmArgs.add("-Dlauncher.debug=true");
+        }
         jvmArgs.addAll(this.jvmArgs);
         jvmArgs.addAll(launcher.jvmArgs);
 
@@ -131,7 +136,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 .replaceAll("\\{\\{METHOD_NAME}}", entrypoint);
     }
 
-    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws MojoExecutionException {
+    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console, String userModelId) throws MojoExecutionException {
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
         processArgs.addAll(compilerArgs);
@@ -149,6 +154,11 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         }
         if (console) processArgs.add("-DCONSOLE");
         if (debug) processArgs.add("-DDEBUG");
+        if (isWindows() && !Utils.isNullOrEmpty(userModelId)) {
+            processArgs.add("-DAUMID=" + userModelId);
+            processArgs.add("/link");
+            processArgs.add("shell32.lib");
+        }
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
         processArgs.addAll(getDefaultLoadingPathOptions());

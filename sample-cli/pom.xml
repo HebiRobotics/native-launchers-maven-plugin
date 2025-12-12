@@ -107,6 +107,7 @@
                                 <launcher>
                                     <name>launcher-hello</name>
                                     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
+                                    <userModelId>hebi.launchers.hello</userModelId>
                                     <jvmArgs>
                                         <arg>-Dlocal.option1=true</arg>
                                         <arg>-Dlocal.option2=false</arg>
