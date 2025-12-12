@@ -108,19 +108,27 @@ int main_entry_point(int argc, char** argv) {
     options[nOptions++].optionString = "-Dpicocli.ansi=tty";
     options[nOptions++].optionString = "-Dfile.encoding=UTF-8";
     options[nOptions++].optionString = "-Dnative.encoding=UTF-8";
+    options[nOptions++].optionString = "-Dsun.jnu.encoding=UTF-8";
 
     #if defined(_WIN32) || defined(_WIN64)
 
         // Set the Console Code Pages to UTF-8 (65001)
-        if (GetConsoleOutputCP() != 0) {  // Check if we have a console
+        DWORD consoleMode = 0;
+        HANDLE stdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+
+        if (GetConsoleMode(stdOut, &consoleMode)) {
+            // We have a real console, set UTF-8
             SetConsoleOutputCP(65001);
             SetConsoleCP(65001);
             PRINT_DEBUG("Set console output to UTF-8 (check: Æøåæøå)");
+
+            // Other piped inputs are determined by the sender
+            options[nOptions++].optionString = "-Dstdin.encoding=UTF-8";
         }
 
-        // Make Java aware that streams are UTF-8
-        options[nOptions++].optionString = "-Dsun.jnu.encoding=UTF-8";
-        options[nOptions++].optionString = "-Dstdin.encoding=UTF-8";
+        // Make Java aware that streams are UTF-8. Note that this does not
+        // handle piped file outputs in classic powershell, but there does not
+        // seem to be a way to fix that from the application side.
         options[nOptions++].optionString = "-Dstdout.encoding=UTF-8";
         options[nOptions++].optionString = "-Dstderr.encoding=UTF-8";
 
