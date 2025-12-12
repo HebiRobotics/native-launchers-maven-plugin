@@ -75,34 +75,12 @@ int main_entry_point(int argc, char** argv) {
     if (exePath == NULL) {
         PRINT_ERROR("Could not determine executable path.");
     }
-    char* pathProperty = concat("-Dlauncher.path=", exePath);
+    char* launcherPath = concat("-Dlauncher.executable=", exePath);
     free(exePath);
-    PRINT_DEBUG(pathProperty);
 
-    // Dynamically bind to library
-    PRINT_DEBUG("load library {{IMAGE_NAME}}");
-    void* handle = dlopen(LIB_FILE, RTLD_LAZY);
-    checkNotNull(handle);
-
-    PRINT_DEBUG("lookup symbol JNI_CreateJavaVM");
-    CreateJavaVM_Func JNI_CreateJavaVM = (CreateJavaVM_Func)dlsym(handle, "JNI_CreateJavaVM");
-    checkNotNull(JNI_CreateJavaVM);
-
-    PRINT_DEBUG("lookup symbol {{METHOD_NAME}}");
-    MainFunction runMain = (MainFunction)dlsym(handle, "{{METHOD_NAME}}");
-    checkNotNull(runMain);
-
-    // Actual main method
-    JavaVM *isolate = 0;
-    JNIEnv *thread = 0;
-
-    PRINT_DEBUG("setting up vm options");
+    // Prepare jvm options
     int nOptions = 0;
-    JavaVMOption options[10]; // TODO: max built-in options + user option count
-
-    // Metadata about the launcher
-    options[nOptions++].optionString = pathProperty;
-    options[nOptions++].optionString = "-Dlauncher.entrypoint={{METHOD_NAME}}";
+    JavaVMOption options[10 + {{NUM_JVM_ARGS}}];
 
     // General options for a good out of the box experience
     options[nOptions++].optionString = "-Dpicocli.ansi=tty";
@@ -134,18 +112,42 @@ int main_entry_point(int argc, char** argv) {
 
     #endif
 
-     JavaVMInitArgs vm_args;
-     vm_args.version = JNI_VERSION_1_8;
-     vm_args.nOptions = nOptions;
-     vm_args.options = options;
-     vm_args.ignoreUnrecognized = JNI_FALSE;
+    // Metadata and user jvm args
+    options[nOptions++].optionString = launcherPath;{{JVM_ARGS}}
+
+    PRINT_DEBUG("adding vm options:");
+    for (int i=0; i < nOptions; i++) {
+        PRINT_DEBUG(options[i].optionString);
+    }
+
+    // Init struct
+    JavaVMInitArgs vm_args;
+    vm_args.version = JNI_VERSION_1_8;
+    vm_args.nOptions = nOptions;
+    vm_args.options = options;
+    vm_args.ignoreUnrecognized = JNI_FALSE;
+
+    // Dynamically bind to library
+    PRINT_DEBUG("load library {{IMAGE_NAME}}");
+    void* handle = dlopen(LIB_FILE, RTLD_LAZY);
+    checkNotNull(handle);
+
+    PRINT_DEBUG("lookup symbol JNI_CreateJavaVM");
+    CreateJavaVM_Func JNI_CreateJavaVM = (CreateJavaVM_Func)dlsym(handle, "JNI_CreateJavaVM");
+    checkNotNull(JNI_CreateJavaVM);
+
+    PRINT_DEBUG("lookup symbol {{METHOD_NAME}}");
+    MainFunction runMain = (MainFunction)dlsym(handle, "{{METHOD_NAME}}");
+    checkNotNull(runMain);
 
     // Call JNI_CreateJavaVM, casting the last argument to void*
+    JavaVM *isolate = 0;
+    JNIEnv *thread = 0;
     if (JNI_CreateJavaVM(&isolate, &thread, &vm_args) != JNI_OK) {
         PRINT_ERROR("Failed to create JavaVM (GraalVM isolate)");
         return 1;
     }
-    free(pathProperty);
+    free(launcherPath);
 
     // Call into shared lib
     PRINT_DEBUG("calling {{METHOD_NAME}}");

@@ -74,6 +74,9 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter
     protected List<String> linkerArgs = Collections.emptyList();
 
+    @Parameter
+    protected List<String> jvmArgs = Collections.emptyList();
+
     @Parameter(required = true)
     protected List<Launcher> launchers;
 
@@ -104,6 +107,9 @@ abstract class BaseConfig extends AbstractMojo {
 
         @Parameter
         protected boolean console = true;
+
+        @Parameter
+        protected List<String> jvmArgs = Collections.emptyList();
 
         public String getMainClass() {
             return mainClass;

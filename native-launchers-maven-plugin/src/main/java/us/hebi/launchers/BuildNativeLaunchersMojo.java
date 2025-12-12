@@ -59,8 +59,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             boolean hasOnlyConsoleLaunchers = true;
             for (Launcher launcher : launchers) {
                 hasOnlyConsoleLaunchers &= launcher.console;
-                String imgName = getNonNull(launcher.imageName, imageName);
-                String sourceCode = fillTemplate(template, imgName, launcher.getSymbolName());
+                String sourceCode = fillTemplate(template, launcher);
                 writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
                 printDebug("Generated source file: " + launcher.getCFileName());
             }
@@ -104,10 +103,32 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
 
     }
 
-    private String fillTemplate(String template, String imageName, String methodName) {
+    private String fillTemplate(String template, Launcher launcher) {
+        String imageName = getNonNull(launcher.imageName, this.imageName);
+        String entrypoint = launcher.getSymbolName();
+
+        List<String> jvmArgs = new ArrayList<>();
+        if (debug) jvmArgs.add("-Dlauncher.debug=true");
+        jvmArgs.add("-Dlauncher.mainClass=" + launcher.mainClass);
+        jvmArgs.add("-Dlauncher.displayName=" + launcher.name);
+        jvmArgs.add("-Dlauncher.imageName=" + imageName);
+        jvmArgs.add("-Dlauncher.nativeMethod=" + entrypoint);
+        jvmArgs.addAll(this.jvmArgs);
+        jvmArgs.addAll(launcher.jvmArgs);
+
+        printDebug("global jvm args: " + this.jvmArgs);
+        printDebug("local jvm args: " + launcher.jvmArgs);
+
+        StringBuilder argString = new StringBuilder();
+        for (String jvmArg : jvmArgs) {
+            argString.append("\n    options[nOptions++].optionString = \"").append(jvmArg).append("\";");
+        }
+
         return template
+                .replaceAll("\\{\\{NUM_JVM_ARGS}}", String.valueOf(jvmArgs.size()))
+                .replaceAll("\\{\\{JVM_ARGS}}", argString.toString())
                 .replaceAll("\\{\\{IMAGE_NAME}}", imageName)
-                .replaceAll("\\{\\{METHOD_NAME}}", methodName);
+                .replaceAll("\\{\\{METHOD_NAME}}", entrypoint);
     }
 
     private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws MojoExecutionException {
