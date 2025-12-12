@@ -19,8 +19,8 @@
  */
 
  /*
- Template for a wrapper c file that calls a main entry point in a dynamically
- linked native-image shared library. Some benefits of doing dynamic linking are
+ Template for a tiny c launcher file that dynamically calls a main entry point inside
+ a native-image shared library. Some benefits of doing dynamic linking are
    (1) customized debug and error messages
    (2) compilation at any phase without requiring the native library
    (3) potentially simpler cross-compilation
@@ -145,7 +145,7 @@ int main_entry_point(int argc, char** argv) {
     MainFunction runMain = (MainFunction)dlsym(handle, "{{METHOD_NAME}}");
     checkNotNull(runMain);
 
-    // Call JNI_CreateJavaVM, casting the last argument to void*
+    // Call JNI_CreateJavaVM
     JavaVM *isolate = 0;
     JNIEnv *thread = 0;
     if (JNI_CreateJavaVM(&isolate, &thread, &vm_args) != JNI_OK) {
