@@ -53,7 +53,7 @@ typedef int (*main_callback_t)(int argc, char **argv);
 
         // Close the application once the callback is done executing
         dispatch_async(dispatch_get_main_queue(), ^{
-            LOG_DEBUG(@"closing");
+            LOG_DEBUG(@"Terminating Cocoa");
             [NSApp terminate:nil];
         });
     });
