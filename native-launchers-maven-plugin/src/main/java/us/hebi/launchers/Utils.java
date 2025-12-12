@@ -37,6 +37,10 @@ import java.util.stream.Collectors;
  */
 class Utils {
 
+    public static boolean isNullOrEmpty(String str) {
+        return str == null || str.isEmpty();
+    }
+
     public static Path writeToDisk(String content, Path targetDir, String fileName) throws IOException {
         return Files.write(targetDir.resolve(fileName),
                 content.getBytes(StandardCharsets.UTF_8),

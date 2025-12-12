@@ -10,7 +10,7 @@ jobs:
   native-image:
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-13, macos-14] # macos13 is Intel, 14 is Arm
+        os: [ubuntu-22.04, windows-2022, macos-15-intel, macos-14]
     
     runs-on: ${{ matrix.os }}
     continue-on-error: true

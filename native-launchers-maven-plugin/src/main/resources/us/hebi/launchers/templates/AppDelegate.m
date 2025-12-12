@@ -26,6 +26,12 @@
 
 #import <Cocoa/Cocoa.h>
 
+#ifdef DEBUG
+#define LOG_DEBUG(message) NSLog(message);
+#else
+#define LOG_DEBUG(message)
+#endif
+
 typedef int (*main_callback_t)(int argc, char **argv);
 
 @interface AppDelegate : NSObject <NSApplicationDelegate>
@@ -37,25 +43,35 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @implementation AppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification  {
-    NSLog(@"Cocoa finished launching");
+    LOG_DEBUG(@"Cocoa finished launching")
 
     // Start the actual main in a background thread as the main thread is busy
     // running the Cocoa event loop
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSLog(@"Handing over application logic to background thread");
+        LOG_DEBUG(@"Handing over application logic to background thread");
         self.callback(self.argc, self.argv);
+
+        // Close the application once the callback is done executing
+        dispatch_async(dispatch_get_main_queue(), ^{
+            LOG_DEBUG(@"Terminating Cocoa");
+            [NSApp terminate:nil];
+        });
     });
 
 }
 
 - (BOOL) applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {
+    return NO; // it gets closed when the callback is done
+}
+
+- (BOOL) applicationSupportsSecureRestorableState:(NSApplication *)app {
     return YES;
 }
 
 @end
 
 void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
-    NSLog(@"Launching Cocoa framework");
+    LOG_DEBUG(@"Launching Cocoa framework");
     @autoreleasepool {
 
         // The main method gets called once the framework finished launching

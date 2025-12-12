@@ -52,18 +52,21 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         try {
 
             // Generate wrapper sources
-            String template = loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/main-dynamic.c");
+            String template = loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/launcher_dynamic.c");
             Path sourceDir = getGeneratedCSourceDir();
             Files.createDirectories(sourceDir);
             printDebug("Generating C sources in " + sourceDir);
             boolean hasOnlyConsoleLaunchers = true;
             for (Launcher launcher : launchers) {
                 hasOnlyConsoleLaunchers &= launcher.console;
-                String imgName = getNonNull(launcher.imageName, imageName);
-                String sourceCode = fillTemplate(template, imgName, launcher.getSymbolName());
+                String sourceCode = fillTemplate(template, launcher);
                 writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
                 printDebug("Generated source file: " + launcher.getCFileName());
             }
+
+            // Add shared header
+            writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/graal_jni_dynamic.h"), sourceDir, "graal_jni_dynamic.h");
+            writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/launcher_utils.h"), sourceDir, "launcher_utils.h");
 
             // Add optional Cocoa launcher
             if (isMac() && !hasOnlyConsoleLaunchers) {
@@ -81,7 +84,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 // Compile source
                 String outputName = launcher.name + (isWindows() ? ".exe" : "");
                 getLog().info("Compiling " + launcher.getCFileName());
-                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console);
+                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console, launcher.userModelId);
 
                 // Move result to the desired output directory
                 Path outputDir = Paths.get(getNonNull(launcher.outputDirectory, outputDirectory));
@@ -100,13 +103,40 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
 
     }
 
-    private String fillTemplate(String template, String imageName, String methodName) {
+    private String fillTemplate(String template, Launcher launcher) {
+        String imageName = getNonNull(launcher.imageName, this.imageName);
+        String entrypoint = launcher.getSymbolName();
+
+        List<String> jvmArgs = new ArrayList<>();
+        jvmArgs.add("-Dlauncher.mainClass=" + launcher.mainClass);
+        jvmArgs.add("-Dlauncher.displayName=" + launcher.name);
+        jvmArgs.add("-Dlauncher.imageName=" + imageName);
+        jvmArgs.add("-Dlauncher.nativeMethod=" + entrypoint);
+        if (!Utils.isNullOrEmpty(launcher.userModelId)) {
+            jvmArgs.add("-Dlauncher.userModelId=" + launcher.userModelId);
+        }
+        if (debug) {
+            jvmArgs.add("-Dlauncher.debug=true");
+        }
+        jvmArgs.addAll(this.jvmArgs);
+        jvmArgs.addAll(launcher.jvmArgs);
+
+        printDebug("global jvm args: " + this.jvmArgs);
+        printDebug("local jvm args: " + launcher.jvmArgs);
+
+        StringBuilder argString = new StringBuilder();
+        for (String jvmArg : jvmArgs) {
+            argString.append("\n    options[nOptions++].optionString = \"").append(jvmArg).append("\";");
+        }
+
         return template
+                .replaceAll("\\{\\{NUM_JVM_ARGS}}", String.valueOf(jvmArgs.size()))
+                .replaceAll("\\{\\{JVM_ARGS}}", argString.toString())
                 .replaceAll("\\{\\{IMAGE_NAME}}", imageName)
-                .replaceAll("\\{\\{METHOD_NAME}}", methodName);
+                .replaceAll("\\{\\{METHOD_NAME}}", entrypoint);
     }
 
-    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console) throws MojoExecutionException {
+    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console, String userModelId) throws MojoExecutionException {
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
         processArgs.addAll(compilerArgs);
@@ -124,6 +154,11 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         }
         if (console) processArgs.add("-DCONSOLE");
         if (debug) processArgs.add("-DDEBUG");
+        if (isWindows() && !Utils.isNullOrEmpty(userModelId)) {
+            processArgs.add("-DAUMID=" + userModelId);
+            processArgs.add("/link");
+            processArgs.add("shell32.lib");
+        }
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
         processArgs.addAll(getDefaultLoadingPathOptions());

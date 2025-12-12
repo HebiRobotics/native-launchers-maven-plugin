@@ -9,12 +9,12 @@ jobs:
         include:
           - runner: ubuntu-22.04
             gc: parallel
-          - runner: macos-13 # Intel
+          - runner: macos-15-intel # Intel
             gc: parallel
           - runner: macos-14 # Apple M3
             gc: parallel
           - runner: windows-2022
-            gc: serial # parallel became stable at >= 24, but that doesn't work with JavaFX
+            gc: parallel
 
     runs-on: ${{ matrix.runner }}
     continue-on-error: true

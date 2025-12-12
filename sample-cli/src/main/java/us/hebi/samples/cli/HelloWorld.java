@@ -6,6 +6,6 @@ package us.hebi.samples.cli;
  */
 public class HelloWorld {
     public static void main(String[] args) {
-        System.out.println("Hello world!");
+        System.out.println("Hello world! \uD83C\uDF0D مرحبا بك 你好 こんにちは");
     }
 }
