@@ -51,44 +51,9 @@
 #endif
 #endif
 
-// =========== PRINTOUTS ===========
-#ifndef DEBUG
-#define PRINT_DEBUG(message)
-#else
-#define PRINT_DEBUG(message) fprintf(stdout, "[DEBUG] %s\n", message)
-#endif
-#define PRINT_ERROR(message) fprintf(stderr, "[ERROR] %s\n", message)
-
-// =========== DEPENDENCIES FOR DLOPEN API ===========
-#ifndef _WIN64
-// Linux & macOS (link -ldl on Linux)
-#include <stdlib.h>
-#include <stdio.h>
-#include <dlfcn.h>
-#else
-// Windows w/ wrappers that make it look the same
-#include <windows.h>
-#include <stdio.h>
-#define RTLD_LAZY 0 // TODO: are there flags we should add?
-void* dlopen(const LPCWSTR name, int flags){
-    HMODULE module = LoadLibraryW(name);
-    return module;
-}
-void* dlsym(void* module, const LPCSTR name){
-    FARPROC addr = GetProcAddress((HMODULE)module, name);
-    return addr;
-}
-char* dlerror(){
-    LPTSTR lpBuffer = NULL;
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,  GetLastError(), 0, (LPTSTR)&lpBuffer, 0, NULL);
-    return lpBuffer;
-}
-#endif
-
 // =========== MAIN CODE ===========
-// Typedefs for symbol lookup. The threads are just pointers, so we
-// can use void* and get away without including any graalvm headers.
 #include "graal_jni_dynamic.h"
+#include "launcher_utils.h"
 typedef int(*MainFunction)(JNIEnv*, int, char**);
 
 void* checkNotNull(void* handle){
@@ -102,6 +67,17 @@ void* checkNotNull(void* handle){
 // Main entry point
 int main_entry_point(int argc, char** argv) {
     PRINT_DEBUG("Running on "OS_FAMILY);
+
+    // Determine the executable path on the native side since
+    // it's more reliable than trying to do it in Java.
+    PRINT_DEBUG("Determining executable path property");
+    char* exePath = getExecutablePath();
+    if (exePath == NULL) {
+        PRINT_ERROR("Could not determine executable path.");
+    }
+    char* pathProperty = concat("-Dapp.executable=", exePath);
+    free(exePath);
+    PRINT_DEBUG(pathProperty);
 
 #ifdef _WIN64
 
@@ -133,18 +109,19 @@ int main_entry_point(int argc, char** argv) {
     JavaVM *isolate = 0;
     JNIEnv *thread = 0;
 
-    JavaVMOption options[7];
-    options[0].optionString = "-Dfile.encoding=UTF-8";
-    options[1].optionString = "-Dnative.encoding=UTF-8";
-    options[2].optionString = "-Dstdin.encoding=UTF-8";
-    options[3].optionString = "-Dstdout.encoding=UTF-8";
-    options[4].optionString = "-Dstderr.encoding=UTF-8";
+    JavaVMOption options[8];
+    options[0].optionString = pathProperty;
+    options[1].optionString = "-Dfile.encoding=UTF-8";
+    options[2].optionString = "-Dnative.encoding=UTF-8";
+    options[3].optionString = "-Dstdin.encoding=UTF-8";
+    options[4].optionString = "-Dstdout.encoding=UTF-8";
     options[5].optionString = "-Dstderr.encoding=UTF-8";
-    options[6].optionString = "-Dsun.jnu.encoding=UTF-8";
+    options[6].optionString = "-Dstderr.encoding=UTF-8";
+    options[7].optionString = "-Dsun.jnu.encoding=UTF-8";
 
      JavaVMInitArgs vm_args;
      vm_args.version = JNI_VERSION_1_8;
-     vm_args.nOptions = 7;
+     vm_args.nOptions = 8;
      vm_args.options = options;
      vm_args.ignoreUnrecognized = JNI_FALSE;
 
@@ -153,6 +130,7 @@ int main_entry_point(int argc, char** argv) {
         PRINT_ERROR("Failed to create GraalVM isolate");
         return 1;
     }
+    free(pathProperty);
 
     // Call into shared lib
     PRINT_DEBUG("calling {{METHOD_NAME}}");

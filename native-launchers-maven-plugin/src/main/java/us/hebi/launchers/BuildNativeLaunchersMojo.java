@@ -67,6 +67,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
 
             // Add shared header
             writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/graal_jni_dynamic.h"), sourceDir, "graal_jni_dynamic.h");
+            writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/launcher_utils.h"), sourceDir, "launcher_utils.h");
 
             // Add optional Cocoa launcher
             if (isMac() && !hasOnlyConsoleLaunchers) {
