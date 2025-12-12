@@ -104,6 +104,7 @@ static inline void* checkNotNull(void* handle){
     #endif
 #elif defined(__linux__)
     #include <unistd.h>
+    #include <string.h>
     #include <limits.h>
     #ifndef PATH_MAX
         #define PATH_MAX 4096
