@@ -13,13 +13,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3       
-      
-      - name: Clean workspace
+      - uses: actions/checkout@v3
+      - uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: 3.9.1
+
+      - name: Maven build
         run: |
-          rm -rf ./sample-cli/target
+          mvn clean package -Pnative -DskipNativeBuild
+          rm -rf ./sample-cli/target/image
           rm -rf ./output
-      
+
       - name: Download native artifacts
         uses: actions/download-artifact@v4
         with:
