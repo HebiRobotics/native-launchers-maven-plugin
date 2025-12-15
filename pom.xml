@@ -67,6 +67,18 @@
                 <native.os>linux</native.os>
             </properties>
         </profile>
+
+        <!-- enable full annotation processing on newer Java versions -->
+        <profile>
+            <id>jdk-lombok-fix</id>
+            <activation>
+                <jdk>[21,)</jdk>
+            </activation>
+            <properties>
+                <maven.compiler.proc>full</maven.compiler.proc>
+            </properties>
+        </profile>
+
     </profiles>
 
 

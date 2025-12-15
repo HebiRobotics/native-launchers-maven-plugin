@@ -13,6 +13,7 @@
     <artifactId>sample-cli</artifactId>
 
     <properties>
+        <picocli.version>4.7.7</picocli.version>
         <imageName>launchers-native-cli</imageName>
         <skipNativeBuild>false</skipNativeBuild>
     </properties>
@@ -22,6 +23,17 @@
             <groupId>org.graalvm.nativeimage</groupId>
             <artifactId>native-image-base</artifactId>
             <version>${graalvm.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+        <dependency> <!-- generates graalvm config automatically -->
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli-codegen</artifactId>
+            <version>${picocli.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -85,6 +97,11 @@
                                 <launcher>
                                     <name>launcher-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-picocli</name>
+                                    <mainClass>us.hebi.samples.cli.HelloPicocli</mainClass>
+                                    <userModelId>hebi.launchers.HelloPicocli</userModelId>
                                 </launcher>
                             </launchers>
                         </configuration>
