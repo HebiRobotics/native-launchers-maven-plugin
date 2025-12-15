@@ -1,6 +1,8 @@
 package us.hebi.samples.cli;
 
+import org.fusesource.jansi.Ansi;
 import picocli.CommandLine;
+import picocli.CommandLine.Model;
 
 import java.util.AbstractMap;
 import java.util.Comparator;
@@ -27,9 +29,16 @@ public class HelloPicocli implements Runnable {
         System.exit(new CommandLine(new HelloPicocli()).execute(args));
     }
 
+    @CommandLine.Spec
+    private Model.CommandSpec spec;
+
     @Override
     public void run() {
-        System.out.println("Hello from Picocli! Add --help for options. \uD83C\uDF0D مرحبا بك 你好 こんにちは.");
+        var out = spec.commandLine().getOut();
+        var colorScheme = spec.commandLine().getColorScheme();
+        out.println(colorScheme.text("@|bold,fg(green) ✓ Hello from Picocli!|@"));
+        out.println(colorScheme.text("@|fg(cyan)   Use --help for options|@"));
+        out.println(colorScheme.text("@|fg(yellow) 🌍 مرحبا بك 你好 こんにちは|@"));
     }
 
     public static class FilterMixin {
@@ -66,7 +75,8 @@ public class HelloPicocli implements Runnable {
         @Override
         public void run() {
             filterMixin.filter(System.getenv().entrySet().stream())
-                    .forEach(entry -> System.out.println(entry.getKey() + "=" + entry.getValue()));
+                    .map(HelloPicocli::toColoredAnsi)
+                    .forEach(System.out::println);
         }
 
     }
@@ -88,9 +98,18 @@ public class HelloPicocli implements Runnable {
                                     String.valueOf(entry.getKey()),
                                     String.valueOf(entry.getValue())
                             )))
-                    .forEach(entry -> System.out.println(entry.getKey() + "=" + entry.getValue()));
+                    .map(HelloPicocli::toColoredAnsi)
+                    .forEach(System.out::println);
         }
 
+    }
+
+    protected static String toColoredAnsi(Map.Entry<String, String> entry) {
+        return Ansi.ansi()
+                .fg(Ansi.Color.YELLOW).a(entry.getKey()).reset()
+                .a("=")
+                .fg(Ansi.Color.GREEN).a(entry.getValue()).reset()
+                .toString();
     }
 
 }
