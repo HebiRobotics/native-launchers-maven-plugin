@@ -29,7 +29,9 @@ import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import static us.hebi.launchers.Utils.*;
 
@@ -72,7 +74,12 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
     private Path generateJavaSource(Path targetDir) throws IOException {
         // Generate Java wrapper class
         TypeSpec.Builder type = TypeSpec.classBuilder("NativeLaunchers");
+        Set<String> generatedEntryPoints = new HashSet<>();
         for (Launcher launcher : launchers) {
+            // Allow multiple launchers using the same entry with different options
+            if (!generatedEntryPoints.add(launcher.getSymbolName())) {
+                continue;
+            }
 
             // Annotation for including the method in the native library
             AnnotationSpec cEntry = AnnotationSpec.builder(CEntryPointClass)
