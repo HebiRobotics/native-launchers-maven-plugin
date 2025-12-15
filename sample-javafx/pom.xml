@@ -10,19 +10,50 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>sample-cli</artifactId>
+    <artifactId>sample-javafx</artifactId>
 
     <properties>
-        <imageName>launchers-native-cli</imageName>
-        <skipNativeBuild>false</skipNativeBuild>
+        <imageName>launchers-native-javafx</imageName>
+        <skipNativeBuild>true</skipNativeBuild>
+        <javafx.version>21</javafx.version>
+        <javafx.scope>provided</javafx.scope>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>us.hebi.launchers.samples</groupId>
+            <artifactId>sample-cli</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>org.graalvm.nativeimage</groupId>
             <artifactId>native-image-base</artifactId>
             <version>${graalvm.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
         </dependency>
     </dependencies>
 
@@ -85,6 +116,19 @@
                                 <launcher>
                                     <name>launcher-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-gui</name>
+                                    <mainClass>us.hebi.samples.gui.HelloJavaFX</mainClass>
+                                    <console>false</console>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-gui-verbose</name>
+                                    <mainClass>us.hebi.samples.gui.HelloJavaFX</mainClass>
+                                    <console>false</console>
+                                    <jvmArgs>
+                                        <arg>-Djavafx.verbose=true</arg>
+                                    </jvmArgs>
                                 </launcher>
                             </launchers>
                         </configuration>

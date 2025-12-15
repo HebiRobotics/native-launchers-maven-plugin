@@ -10,7 +10,7 @@ import javafx.stage.Stage;
  * @author Florian Enner
  * @since 19 Okt 2023
  */
-public class GuiApp extends Application {
+public class HelloJavaFX extends Application {
 
     @Override
     public void start(Stage stage) throws Exception {

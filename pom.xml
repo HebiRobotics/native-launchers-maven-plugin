@@ -10,17 +10,27 @@
     <packaging>pom</packaging>
 
     <properties>
+
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.deploy.skip>true</maven.deploy.skip>
+
         <native.os>${os.name}</native.os>
         <native.arch>${os.arch}</native.arch>
+        <outputDir>${project.build.directory}/image/${native.os}-${native.arch}</outputDir>
+        <sharedLibrary>true</sharedLibrary>
+
+        <graalvm.version>24.0.2</graalvm.version>
+        <graalvm.tools.version>0.11.1</graalvm.tools.version>
+        <graalvm.gc>serial</graalvm.gc>
+
     </properties>
 
     <modules>
         <module>native-launchers-maven-plugin</module>
         <module>sample-cli</module>
+        <module>sample-javafx</module>
     </modules>
 
     <profiles>
