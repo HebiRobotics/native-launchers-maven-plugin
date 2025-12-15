@@ -69,7 +69,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/launcher_utils.h"), sourceDir, "launcher_utils.h");
 
             // Add optional Cocoa launcher
-            if (isMac() && !needsCocoa) {
+            if (isMac() && needsCocoa) {
                 writeToDisk(
                         loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/AppDelegate.m"),
                         sourceDir, "AppDelegate.m");
