@@ -112,9 +112,6 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
         jvmArgs.add("-Dlauncher.displayName=" + launcher.name);
         jvmArgs.add("-Dlauncher.imageName=" + imageName);
         jvmArgs.add("-Dlauncher.nativeMethod=" + entrypoint);
-        if (!Utils.isNullOrEmpty(launcher.userModelId)) {
-            jvmArgs.add("-Dlauncher.userModelId=" + launcher.userModelId);
-        }
         if (debug) {
             jvmArgs.add("-Dlauncher.debug=true");
         }
@@ -286,7 +283,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
     static List<String> getConveyorOptions() {
         if (isMac()) {
             // On macOS Conveyor will inject its own library into the binary to initialize
-            // the update system. This ensures that is sufficient empty space in the headers
+            // the update system. This ensures that there is empty space in the headers
             // to make this possible.
             // see https://conveyor.hydraulic.dev/15.1/configs/native-apps/#building-compatible-binaries
             return Arrays.asList(

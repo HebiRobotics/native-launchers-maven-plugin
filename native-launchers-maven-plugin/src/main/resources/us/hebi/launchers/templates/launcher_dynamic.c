@@ -110,6 +110,10 @@ int main_entry_point(int argc, char** argv) {
         HRESULT hr = SetCurrentProcessExplicitAppUserModelID(app_aumid);
         if (SUCCEEDED(hr)) {
             PRINT_DEBUG("Set Application User Model Id: " TOSTRING(AUMID));
+
+             // Set property similar to Conveyor's 'app.windows.userModelID'
+            // https://conveyor.hydraulic.dev/21.0/configs/os-integration/#windows-appusermodelid-aumid
+            options[nOptions++].optionString = "-Dlauncher.windows.userModelID=" TOSTRING(AUMID);
         } else {
             PRINT_ERROR("Failed to set Application User Model Id)");
         }
