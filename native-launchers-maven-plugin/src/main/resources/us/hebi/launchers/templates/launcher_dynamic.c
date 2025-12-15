@@ -110,6 +110,10 @@ int main_entry_point(int argc, char** argv) {
         HRESULT hr = SetCurrentProcessExplicitAppUserModelID(app_aumid);
         if (SUCCEEDED(hr)) {
             PRINT_DEBUG("Set Application User Model Id: " TOSTRING(AUMID));
+
+             // Set property similar to Conveyor's 'app.windows.userModelID'
+            // https://conveyor.hydraulic.dev/21.0/configs/os-integration/#windows-appusermodelid-aumid
+            options[nOptions++].optionString = "-Dlauncher.windows.userModelID=" TOSTRING(AUMID);
         } else {
             PRINT_ERROR("Failed to set Application User Model Id)");
         }
@@ -161,7 +165,7 @@ int main_entry_point(int argc, char** argv) {
 
 // Logic to handle macOS specifics where the Cocoa/UI loop needs to take over the
 // main thread and the actual main method needs to be launched in the background
-#if defined(__APPLE__) && !defined(CONSOLE)
+#if defined(__APPLE__) && defined(COCOA)
 typedef int (*main_callback_t)(int argc, char **argv);
 extern void launchCocoaApp(int argc, char** argv, main_callback_t callback);
 int main(int argc, char** argv) {

@@ -10,16 +10,21 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>sample-cli</artifactId>
+    <artifactId>sample-javafx</artifactId>
 
     <properties>
-        <picocli.version>4.7.7</picocli.version>
-        <jansi.version>2.4.2</jansi.version>
-        <imageName>launchers-native-cli</imageName>
-        <skipNativeBuild>false</skipNativeBuild>
+        <imageName>launchers-native-javafx</imageName>
+        <skipNativeBuild>false</skipNativeBuild> <!-- only works with Bellsoft's liberica NIK 23 -->
+        <javafx.version>21</javafx.version>
+        <javafx.scope>provided</javafx.scope>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>us.hebi.launchers.samples</groupId>
+            <artifactId>sample-cli</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>org.graalvm.nativeimage</groupId>
             <artifactId>native-image-base</artifactId>
@@ -27,26 +32,34 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli</artifactId>
-            <version>${picocli.version}</version>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
         </dependency>
-        <dependency> <!-- ANSI coloring -->
-            <groupId>org.fusesource.jansi</groupId>
-            <artifactId>jansi</artifactId>
-            <version>${jansi.version}</version>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
         </dependency>
-        <dependency> <!-- generates graalvm config automatically -->
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli-codegen</artifactId>
-            <version>${picocli.version}</version>
-            <scope>provided</scope>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <scope>${javafx.scope}</scope>
         </dependency>
     </dependencies>
 
     <profiles>
         <profile>
-            <id>native</id>
+            <id>nativeJavaFX</id>
             <build>
                 <plugins>
 
@@ -86,28 +99,29 @@
                         <configuration>
                             <outputDirectory>${outputDir}</outputDirectory>
                             <imageName>${imageName}</imageName>
-                            <jvmArgs>
-                                <arg>-Dglobal.option1=true</arg>
-                                <arg>-Dglobal.option2=false</arg>
-                            </jvmArgs>
                             <launchers>
                                 <launcher>
                                     <name>launcher-hello</name>
                                     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
                                     <userModelId>hebi.launchers.hello</userModelId>
-                                    <jvmArgs>
-                                        <arg>-Dlocal.option1=true</arg>
-                                        <arg>-Dlocal.option2=false</arg>
-                                    </jvmArgs>
                                 </launcher>
                                 <launcher>
                                     <name>launcher-dir</name>
                                     <mainClass>us.hebi.samples.cli.PrintDirectoryContents</mainClass>
                                 </launcher>
                                 <launcher>
-                                    <name>launcher-picocli</name>
-                                    <mainClass>us.hebi.samples.cli.HelloPicocli</mainClass>
-                                    <userModelId>hebi.launchers.HelloPicocli</userModelId>
+                                    <name>launcher-gui</name>
+                                    <mainClass>us.hebi.samples.gui.HelloJavaFX</mainClass>
+                                    <console>false</console>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-gui-verbose</name>
+                                    <mainClass>us.hebi.samples.gui.HelloJavaFX</mainClass>
+                                    <console>true</console> <!-- otherwise there is no output on Windows -->
+                                    <cocoa>true</cocoa>
+                                    <jvmArgs>
+                                        <arg>-Djavafx.verbose=true</arg>
+                                    </jvmArgs>
                                 </launcher>
                             </launchers>
                         </configuration>
@@ -123,25 +137,6 @@
                                 <goals>
                                     <goal>build-launchers</goal>
                                 </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-
-                    <!-- runtime dependencies for Conveyor packaging -->
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>copy-dependencies</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>copy-dependencies</goal>
-                                </goals>
-                                <configuration>
-                                    <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
-                                    <includeScope>runtime</includeScope>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>

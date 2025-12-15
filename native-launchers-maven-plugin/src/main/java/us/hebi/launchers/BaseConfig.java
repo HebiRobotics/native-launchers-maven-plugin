@@ -113,7 +113,14 @@ abstract class BaseConfig extends AbstractMojo {
         protected boolean console = true;
 
         @Parameter
+        protected Boolean cocoa;
+
+        @Parameter
         protected List<String> jvmArgs = Collections.emptyList();
+
+        public boolean enableCocoa() {
+            return (cocoa != null && cocoa) || !console;
+        }
 
         public String getMainClass() {
             return mainClass;
@@ -128,7 +135,7 @@ abstract class BaseConfig extends AbstractMojo {
         }
 
         public String getSymbolName() {
-            if(symbolName == null){
+            if (symbolName == null) {
                 symbolName = "run_" + mainClass.replaceAll("\\.", "_") + "_main";
             }
             return symbolName;
