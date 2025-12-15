@@ -56,9 +56,9 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             Path sourceDir = getGeneratedCSourceDir();
             Files.createDirectories(sourceDir);
             printDebug("Generating C sources in " + sourceDir);
-            boolean hasOnlyConsoleLaunchers = true;
+            boolean needsCocoa = false;
             for (Launcher launcher : launchers) {
-                hasOnlyConsoleLaunchers &= launcher.console;
+                needsCocoa |= launcher.enableCocoa();
                 String sourceCode = fillTemplate(template, launcher);
                 writeToDisk(sourceCode, sourceDir, launcher.getCFileName());
                 printDebug("Generated source file: " + launcher.getCFileName());
@@ -69,7 +69,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             writeToDisk(loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/launcher_utils.h"), sourceDir, "launcher_utils.h");
 
             // Add optional Cocoa launcher
-            if (isMac() && !hasOnlyConsoleLaunchers) {
+            if (isMac() && !needsCocoa) {
                 writeToDisk(
                         loadResourceAsString(GenerateJavaSourcesMojo.class, "templates/AppDelegate.m"),
                         sourceDir, "AppDelegate.m");
@@ -84,7 +84,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 // Compile source
                 String outputName = launcher.name + (isWindows() ? ".exe" : "");
                 getLog().info("Compiling " + launcher.getCFileName());
-                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console, launcher.userModelId);
+                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console, launcher.enableCocoa(), launcher.userModelId);
 
                 // Move result to the desired output directory
                 Path outputDir = Paths.get(getNonNull(launcher.outputDirectory, outputDirectory));
@@ -133,7 +133,7 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
                 .replaceAll("\\{\\{METHOD_NAME}}", entrypoint);
     }
 
-    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console, String userModelId) throws MojoExecutionException {
+    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console, boolean cocoa, String userModelId) throws MojoExecutionException {
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
         processArgs.addAll(compilerArgs);
@@ -144,10 +144,11 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             processArgs.add(outputName);
         }
         processArgs.add(srcFileName);
-        if (!console && isMac()) {
+        if (isMac() && cocoa) {
             processArgs.add("AppDelegate.m");
             processArgs.add("-framework");
             processArgs.add("Cocoa");
+            processArgs.add("-DCOCOA");
         }
         if (console) processArgs.add("-DCONSOLE");
         if (debug) processArgs.add("-DDEBUG");

@@ -99,19 +99,11 @@
                         <configuration>
                             <outputDirectory>${outputDir}</outputDirectory>
                             <imageName>${imageName}</imageName>
-                            <jvmArgs>
-                                <arg>-Dglobal.option1=true</arg>
-                                <arg>-Dglobal.option2=false</arg>
-                            </jvmArgs>
                             <launchers>
                                 <launcher>
                                     <name>launcher-hello</name>
                                     <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
                                     <userModelId>hebi.launchers.hello</userModelId>
-                                    <jvmArgs>
-                                        <arg>-Dlocal.option1=true</arg>
-                                        <arg>-Dlocal.option2=false</arg>
-                                    </jvmArgs>
                                 </launcher>
                                 <launcher>
                                     <name>launcher-dir</name>
@@ -125,7 +117,8 @@
                                 <launcher>
                                     <name>launcher-gui-verbose</name>
                                     <mainClass>us.hebi.samples.gui.HelloJavaFX</mainClass>
-                                    <console>false</console>
+                                    <console>true</console> <!-- otherwise there is no output on Windows -->
+                                    <cocoa>true</cocoa>
                                     <jvmArgs>
                                         <arg>-Djavafx.verbose=true</arg>
                                     </jvmArgs>
