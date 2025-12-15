@@ -61,7 +61,7 @@ public class GenerateJavaSourcesMojo extends BaseConfig {
             checkAnnotationDependency(
                     "org.graalvm.nativeimage",
                     "native-image-base",
-                    "22.3.2",
+                    "24.0.2",
                     "provided"
             );
 

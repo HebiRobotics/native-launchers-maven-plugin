@@ -14,7 +14,7 @@
 
     <properties>
         <imageName>launchers-native-javafx</imageName>
-        <skipNativeBuild>true</skipNativeBuild> <!-- only works with Bellsoft's liberica NIK 23 -->
+        <skipNativeBuild>false</skipNativeBuild> <!-- only works with Bellsoft's liberica NIK 23 -->
         <javafx.version>21</javafx.version>
         <javafx.scope>provided</javafx.scope>
     </properties>
@@ -59,7 +59,7 @@
 
     <profiles>
         <profile>
-            <id>native</id>
+            <id>nativeJavaFX</id>
             <build>
                 <plugins>
 
