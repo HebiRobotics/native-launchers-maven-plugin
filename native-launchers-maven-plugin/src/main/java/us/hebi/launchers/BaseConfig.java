@@ -68,9 +68,6 @@ abstract class BaseConfig extends AbstractMojo {
             defaultValue = "${project.build.directory}/generated-sources/native-launchers")
     protected String sourceDirectory;
 
-    @Parameter(property = "launchers.sourceDirectory", defaultValue = "launchers", required = true)
-    protected String launcherPackage;
-
     @Parameter
     protected List<String> compiler;
 

@@ -106,16 +106,10 @@
                             </launchers>
                         </configuration>
                         <executions>
-                            <execution> <!-- before compilation and native-image -->
-                                <id>generate-config</id>
+                            <execution> <!-- before native-image compilation -->
+                                <id>generate-launchers</id>
                                 <goals>
-                                    <goal>gen-config</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-executables</id>
-                                <goals>
-                                    <goal>build-launchers</goal>
+                                    <goal>generate-launchers</goal>
                                 </goals>
                             </execution>
                         </executions>

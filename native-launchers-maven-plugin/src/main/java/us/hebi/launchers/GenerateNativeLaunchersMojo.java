@@ -30,6 +30,7 @@ import org.codehaus.plexus.util.cli.Commandline;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,14 +43,19 @@ import static us.hebi.launchers.Utils.*;
  * @author Florian Enner
  * @since 09 Jun 2023
  */
-@Mojo(name = "build-launchers", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class BuildNativeLaunchersMojo extends BaseConfig {
+@Mojo(name = "generate-launchers", defaultPhase = LifecyclePhase.GENERATE_RESOURCES)
+public class GenerateNativeLaunchersMojo extends BaseConfig {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (shouldSkip()) return;
 
         try {
+             // Generate JNI config, so we can call the classes from the launchers
+            printDebug("Generating JNI configuration for native-image");
+            Path targetDir = getGeneratedMetaInfDir();
+            generateJniConfig(targetDir);
+
 
             // Generate wrapper sources
             String template = loadResourceAsString(BaseConfig.class, "templates/launcher_dynamic.c");
@@ -313,6 +319,66 @@ public class BuildNativeLaunchersMojo extends BaseConfig {
             );
         }
         return Collections.emptyList();
+    }
+
+    public Path getGeneratedMetaInfDir() {
+        return Paths.get(
+                session.getCurrentProject().getBuild().getOutputDirectory(),
+                "META-INF",
+                "native-image",
+                "launchers",
+                groupId,
+                artifactId
+        ).toAbsolutePath();
+    }
+
+    /**
+     * Generates a GraalVM config file that makes sure that all required classes can be
+     * accessed from the JNI launchers
+     */
+    private Path generateJniConfig(Path targetDir) throws IOException {
+        Files.createDirectories(targetDir);
+
+        Set<String> processedClasses = new HashSet<>();
+        StringBuilder jniConfig = new StringBuilder();
+        jniConfig.append("[\n");
+        boolean needsComma = false;
+
+        for (Launcher launcher : launchers) {
+            String mainClass = launcher.getMainClass();
+
+            // Only add each class once
+            if (!processedClasses.add(mainClass)) {
+                continue;
+            }
+
+            if (needsComma) {
+                jniConfig.append(",\n");
+            }
+            needsComma = true;
+            jniConfig.append("  {\n");
+            jniConfig.append("    \"name\": \"").append(mainClass).append("\",\n");
+            jniConfig.append("    \"methods\": [\n");
+            jniConfig.append("      {\n");
+            jniConfig.append("        \"name\": \"main\",\n");
+            jniConfig.append("        \"parameterTypes\": [\"java.lang.String[]\"]\n");
+            jniConfig.append("      }\n");
+            jniConfig.append("    ]\n");
+            jniConfig.append("  }");
+        }
+
+        jniConfig.append("\n]");
+
+        Path configFile = targetDir.resolve("jni-config.json");
+        Files.write(configFile, jniConfig.toString().getBytes(StandardCharsets.UTF_8));
+
+        StringBuilder msg = new StringBuilder("Generated JNI config in ").append(configFile).append(":");
+        for (Launcher launcher : launchers) {
+            msg.append("\n  ").append(launcher.getMainClass()).append(".main(String[])");
+        }
+        getLog().info(msg.toString());
+
+        return configFile;
     }
 
 }
