@@ -21,12 +21,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.graalvm.nativeimage</groupId>
-            <artifactId>native-image-base</artifactId>
-            <version>${graalvm.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
             <version>${picocli.version}</version>
@@ -113,9 +107,9 @@
                         </configuration>
                         <executions>
                             <execution> <!-- before compilation and native-image -->
-                                <id>generate-stubs</id>
+                                <id>generate-config</id>
                                 <goals>
-                                    <goal>gen-sources</goal>
+                                    <goal>gen-config</goal>
                                 </goals>
                             </execution>
                             <execution>

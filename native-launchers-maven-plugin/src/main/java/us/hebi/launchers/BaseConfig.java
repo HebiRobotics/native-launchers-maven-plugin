@@ -42,6 +42,12 @@ abstract class BaseConfig extends AbstractMojo {
     @Parameter(defaultValue = "${session}", readonly = true)
     protected MavenSession session;
 
+    @Parameter(defaultValue = "${project.groupId}", readonly = true)
+    protected String groupId;
+
+    @Parameter(defaultValue = "${project.artifactId}", readonly = true)
+    protected String artifactId;
+
     // default to same as https://github.com/graalvm/native-build-tools/blob/master/native-maven-plugin/src/main/java/org/graalvm/buildtools/maven/AbstractNativeImageMojo.java
     @Parameter(property = "outputDir", defaultValue = "${project.build.directory}", required = true)
     protected String outputDirectory; // default to native-maven-plugin value
