@@ -27,7 +27,7 @@
 
 // =========== PRINTOUTS ===========
 #ifndef DEBUG
-#define PRINT_DEBUG(message)
+#define PRINT_DEBUG(...)
 #else
 #define PRINT_DEBUG(...) fprintf(stdout, "[DEBUG] "), fprintf(stdout, __VA_ARGS__), fprintf(stdout, "\n")
 #endif
@@ -84,7 +84,7 @@ extern "C" {
 
 static inline void* checkNotNull(void* handle){
     if(handle == 0) {
-        PRINT_ERROR(dlerror());
+        PRINT_ERROR("%s", dlerror());
         exit(EXIT_FAILURE);
     }
     return handle;
