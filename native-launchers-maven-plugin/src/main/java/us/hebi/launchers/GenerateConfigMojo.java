@@ -75,13 +75,12 @@ public class GenerateConfigMojo extends BaseConfig {
                 jniConfig.append(",\n");
             }
             needsComma = true;
-
             jniConfig.append("  {\n");
             jniConfig.append("    \"name\": \"").append(mainClass).append("\",\n");
             jniConfig.append("    \"methods\": [\n");
             jniConfig.append("      {\n");
             jniConfig.append("        \"name\": \"main\",\n");
-            jniConfig.append("        \"parameterTypes\": [\"[Ljava/lang/String;\"]\n");
+            jniConfig.append("        \"parameterTypes\": [\"java.lang.String[]\"]\n");
             jniConfig.append("      }\n");
             jniConfig.append("    ]\n");
             jniConfig.append("  }");
@@ -106,9 +105,9 @@ public class GenerateConfigMojo extends BaseConfig {
                 session.getCurrentProject().getBuild().getOutputDirectory(),
                 "META-INF",
                 "native-image",
+                "launchers",
                 groupId,
-                artifactId,
-                "launchers"
+                artifactId
         ).toAbsolutePath();
     }
 

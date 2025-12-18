@@ -29,9 +29,9 @@
 #ifndef DEBUG
 #define PRINT_DEBUG(message)
 #else
-#define PRINT_DEBUG(message) fprintf(stdout, "[DEBUG] %s\n", message)
+#define PRINT_DEBUG(...) fprintf(stdout, "[DEBUG] "), fprintf(stdout, __VA_ARGS__), fprintf(stdout, "\n")
 #endif
-#define PRINT_ERROR(message) fprintf(stderr, "[ERROR] %s\n", message)
+#define PRINT_ERROR(...) fprintf(stderr, "[ERROR] "), fprintf(stderr, __VA_ARGS__), fprintf(stderr, "\n")
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)

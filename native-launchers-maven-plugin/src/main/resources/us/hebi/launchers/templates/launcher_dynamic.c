@@ -52,9 +52,19 @@
 #endif
 
 // =========== MAIN CODE ===========
-#include "graal_jni_dynamic.h"
+// Disable statically linked methods
+#define _JNI_IMPLEMENTATION_
+#include "jni.h"
+
+// Function signature for dynamic lookup
+typedef jint (JNICALL *CreateJavaVM_Func)(
+    JavaVM **pvm,
+    JNIEnv **penv,         // type-safe alias for void**
+    JavaVMInitArgs *args    // type-safe alias for void*
+);
+
+
 #include "launcher_utils.h"
-typedef int(*MainFunction)(JNIEnv*, int, char**);
 
 // Main entry point
 int main_entry_point(int argc, char** argv) {
@@ -145,22 +155,95 @@ int main_entry_point(int argc, char** argv) {
     CreateJavaVM_Func JNI_CreateJavaVM = (CreateJavaVM_Func)dlsym(handle, "JNI_CreateJavaVM");
     checkNotNull(JNI_CreateJavaVM);
 
-    PRINT_DEBUG("Looking up symbol: {{METHOD_NAME}}");
-    MainFunction runMain = (MainFunction)dlsym(handle, "{{METHOD_NAME}}");
-    checkNotNull(runMain);
-
     // Call JNI_CreateJavaVM
-    JavaVM *isolate = 0;
-    JNIEnv *thread = 0;
-    if (JNI_CreateJavaVM(&isolate, &thread, &vm_args) != JNI_OK) {
+    JavaVM *vm = 0; // same as isolate
+    JNIEnv *env = 0; // same as thread
+    if (JNI_CreateJavaVM(&vm, &env, &vm_args) != JNI_OK) {
         PRINT_ERROR("Failed to create JavaVM (GraalVM isolate)");
         return 1;
     }
     free(launcherPath);
 
-    // Call into shared lib
-    PRINT_DEBUG("Calling {{METHOD_NAME}}");
-    return runMain(thread, argc, argv);
+    // Convert C args to Java String[]
+    jobjectArray javaArgs = NULL;
+    jclass stringClass = (*env)->FindClass(env, "java/lang/String");
+    if (stringClass == NULL) {
+        PRINT_ERROR("Failed to find java/lang/String class");
+        return 1;
+    }
+
+    // Java omits the program name (argv[0])
+    int arrayLength = (argc > 0) ? argc - 1 : 0;
+    javaArgs = (*env)->NewObjectArray(env, arrayLength, stringClass, NULL);
+    if (javaArgs == NULL) {
+        PRINT_ERROR("Failed to create String array");
+        (*env)->DeleteLocalRef(env, stringClass);
+        return 1;
+    }
+
+    for (int i = 0; i < arrayLength; i++) {
+        jstring str = (*env)->NewStringUTF(env, argv[i + 1]);
+        if (str == NULL) {
+            PRINT_ERROR("Failed to create string for argument %d", i);
+            (*env)->DeleteLocalRef(env, javaArgs);
+            (*env)->DeleteLocalRef(env, stringClass);
+            return 1;
+        }
+        (*env)->SetObjectArrayElement(env, javaArgs, i, str);
+        (*env)->DeleteLocalRef(env, str);
+    }
+    (*env)->DeleteLocalRef(env, stringClass);
+
+    // Load main class via reflection
+    char internalClassName[512];
+    snprintf(internalClassName, sizeof(internalClassName), "%s", "{{MAIN_CLASS}}");
+    for (int i = 0; internalClassName[i]; i++) {
+        if (internalClassName[i] == '.') {
+            internalClassName[i] = '/';
+        }
+    }
+
+    PRINT_DEBUG("Loading class: %s", internalClassName);
+    jclass mainClass = (*env)->FindClass(env, internalClassName);
+    if (mainClass == NULL) {
+        PRINT_ERROR("Failed to find main class: %s", internalClassName);
+        (*env)->DeleteLocalRef(env, javaArgs);
+        return 1;
+    }
+
+    // Find main method: public static void main(String[])
+    PRINT_DEBUG("Looking up method: main([Ljava/lang/String;)V");
+    jmethodID mainMethod = (*env)->GetStaticMethodID(env, mainClass, "main", "([Ljava/lang/String;)V");
+    if (mainMethod == NULL) {
+        PRINT_ERROR("Failed to find main method in {{MAIN_CLASS}}. Ensure the signature matches public static void main(String[])");
+        if ((*env)->ExceptionCheck(env)) {
+            (*env)->ExceptionDescribe(env);
+            (*env)->ExceptionClear(env);
+        }
+        (*env)->DeleteLocalRef(env, javaArgs);
+        (*env)->DeleteLocalRef(env, mainClass);
+        return 1;
+    }
+
+    // Call the main method
+    PRINT_DEBUG("Invoking main method for {{MAIN_CLASS}}");
+    (*env)->CallStaticVoidMethod(env, mainClass, mainMethod, javaArgs);
+
+    // Check for exceptions
+    jint exitCode = 0;
+    if ((*env)->ExceptionCheck(env)) {
+        PRINT_ERROR("Exception occurred during main method execution");
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        exitCode = 1;
+    }
+
+    // Cleanup
+    (*env)->DeleteLocalRef(env, javaArgs);
+    (*env)->DeleteLocalRef(env, mainClass);
+
+    return exitCode;
+
 }
 
 // Logic to handle macOS specifics where the Cocoa/UI loop needs to take over the
