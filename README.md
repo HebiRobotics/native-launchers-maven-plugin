@@ -20,23 +20,13 @@ and provide a better default experience for command line apps: Windows streams a
 
 ## Maven Instructions
 
-1. add the compilation dependency for the generated graal annotations
-```xml
-<dependency>
-    <groupId>org.graalvm.nativeimage</groupId>
-    <artifactId>native-image-base</artifactId>
-    <version>24.0.2</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-2. add the build plugin and define the names of the executables and the Java main methods they should map to. For a full sample configuration check [sample-cli](./sample-cli/pom.xml).
+1. Add the build plugin and define the names of the executables and the Java main methods they should map to. For a full sample configuration check [sample-cli](./sample-cli/pom.xml).
 
 ```xml
 <plugin>
     <groupId>us.hebi.launchers</groupId>
     <artifactId>native-launchers-maven-plugin</artifactId>
-    <version>0.4</version>
+    <version>0.5</version>
     <configuration>
         <outputDirectory>${graalvm.outputDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>
@@ -44,6 +34,9 @@ and provide a better default experience for command line apps: Windows streams a
             <launcher>
                 <name>cli-hello</name>
                 <mainClass>us.hebi.samples.cli.HelloWorld</mainClass>
+                <jvmArgs>
+                    <arg>-Dcustom.property=true</arg>
+                </jvmArgs>
             </launcher>
             <launcher>
                 <name>cli-dir</name>
@@ -52,23 +45,17 @@ and provide a better default experience for command line apps: Windows streams a
         </launchers>
     </configuration>
     <executions>
-        <execution> <!-- generate Java sources (before compilation) -->
-            <id>generate-stubs</id>
+        <execution> <!-- before native-image compilation -->
+            <id>generate-launchers</id>
             <goals>
-                <goal>gen-sources</goal>
-            </goals>
-        </execution>
-        <execution> <!-- build launchers -->
-            <id>build-executables</id>
-            <goals>
-                <goal>build-launchers</goal>
+                <goal>generate-launchers</goal>
             </goals>
         </execution>
     </executions>
 </plugin> 
 ```
 
-3. create the GraalVM native-library with `<sharedLibrary>true</sharedLibrary>`. Note that the source may need [additional configuration](https://www.graalvm.org/22.3/reference-manual/native-image/guides/configure-with-tracing-agent/) (e.g. for JNI and reflection) to be compatible with native-image.
+2. Create the GraalVM native-library with `<sharedLibrary>true</sharedLibrary>`. Note that the source may need [additional configuration](https://www.graalvm.org/22.3/reference-manual/native-image/guides/configure-with-tracing-agent/) (e.g. for JNI and reflection) to be compatible with native-image.
 
 ```xml
 <plugin>
@@ -112,38 +99,23 @@ The plugin specifies the name of the executable and the corresponding Java metho
 </launcher>
 ```
 
-The plugin is then divided into two steps:
+The plugin then generates a `jni-config.json` to ensure that the required entry points are included in the native-image.
 
-1. The `[gen-sources]` step generates a Java file with [@CEntryPoint](https://www.graalvm.org/sdk/javadoc/org/graalvm/nativeimage/c/function/CEntryPoint.html) annotated methods that result in exported symbols in the shared library. The methods handle the translation of C to Java arguments and delegate to the Java main methods. The generated class below would result in a native `int run_us_hebi_samples_cli_HelloWorld_main(graal_isolatethread_t*, int, char**)` method.
-
-```Java
-class NativeLaunchers {
-    
-  @CEntryPoint(name = "run_us_hebi_samples_cli_HelloWorld_main")
-  static int run_us_hebi_samples_cli_HelloWorld_main(IsolateThread thread, int argc,  CCharPointerPointer argv) {
-    try {
-      String[] args = toJavaArgs(argc, argv);
-      HelloWorld.main(args);
-      return 0;
-    } catch (Throwable t) {
-      t.printStackTrace();
-      return 1;
-    }
+```json
+[
+  {
+    "name": "us.hebi.samples.cli.HelloWorld",
+    "methods": [
+      {
+        "name": "main",
+        "parameterTypes": ["java.lang.String[]"]
+      }
+    ]
   }
-
-  private static String[] toJavaArgs(final int argc, final CCharPointerPointer argv) {
-    // Java omits the name of the program argv[0]
-    String[] args = new String[argc - 1];
-     for (int i = 0; i < args.length; i++) {
-      args[i] = CTypeConversion.toJavaString(argv.addressOf(i + 1).read());
-    }
-    return args;
-  }
-  
-}
+]
 ```
 
-2. The `[build-launchers]` step builds tiny launchers that load and call into the shared library. The loading is done dynamically, so there are no compile time dependencies and the launchers can be built independently of the native-image. The template for the native code generation is in [main-dynamic.c](native-launchers-maven-plugin/src/main/resources/us/hebi/launchers/templates/main-dynamic.c).
+It additionally creates small native launchers that dynamically load the native library and call the entry point via JNI. Since the loading is dynamic, there are no compile time dependencies, and the launchers can be built independently of the native-image. The template for the native code generation is in [main-dynamic.c](native-launchers-maven-plugin/src/main/resources/us/hebi/launchers/templates/main-dynamic.c).
 
 A hello world app with debug info enabled (`-Dlaunchers.debug`) produces the following printout
 
@@ -171,9 +143,9 @@ bin> hello.exe arg1 arg2
 [DEBUG] -Dcustom.property=true
 [DEBUG] Loading library L"launchers-native-cli.dll"
 [DEBUG] Looking up symbol: JNI_CreateJavaVM
-[DEBUG] Looking up symbol: run_us_hebi_samples_cli_HelloWorld_main
-[DEBUG] Calling run_us_hebi_samples_cli_HelloWorld_main
-[DEBUG] calling us.hebi.samples.cli.HelloWorld (args: [arg1, arg2])
+[DEBUG] Loading class: us/hebi/samples/cli/HelloWorld
+[DEBUG] Looking up method: main([Ljava/lang/String;)V
+[DEBUG] Invoking main method for us.hebi.samples.cli.HelloWorld
 Hello world! 🌍 مرحبا بك 你好 こんにちは
 ```
 
