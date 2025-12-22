@@ -20,6 +20,7 @@
 
 package us.hebi.launchers;
 
+import org.apache.maven.execution.BuildSuccess;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
@@ -29,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * @author Florian Enner
@@ -118,11 +120,29 @@ abstract class BaseConfig extends AbstractMojo {
         @Parameter
         protected Boolean cocoa;
 
+        /**
+         * Enables capturing macOS Apple Events (e.g., "Open With" or dropping files on the dock).
+         * When true, file paths are redirected to the main method via background threads,
+         * emulating the multi-process behavior of Windows/Linux.
+         */
+        @Parameter(property = "cocoaFileHandler", defaultValue = "false")
+        protected boolean cocoaFileHandler = false;
+
         @Parameter
         protected List<String> jvmArgs = Collections.emptyList();
 
         public boolean enableCocoa() {
             return (cocoa != null && cocoa) || !console;
+        }
+
+        public boolean enableCocoaFileHandler() {
+            return enableCocoa() && cocoaFileHandler;
+        }
+
+        public Optional<String> getUserModelId() {
+            return Optional.ofNullable(userModelId)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty());
         }
 
         public String getMainClass() {
@@ -135,6 +155,10 @@ abstract class BaseConfig extends AbstractMojo {
 
         public String getCFileName() {
             return name + ".c";
+        }
+
+        public String getOutputName() {
+            return Utils.isWindows() ? name + ".exe" : name;
         }
 
         public String getSymbolName() {

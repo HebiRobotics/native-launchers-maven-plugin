@@ -25,6 +25,7 @@
  */
 
 #import <Cocoa/Cocoa.h>
+#import <stdatomic.h>
 
 #ifdef DEBUG
 #define LOG_DEBUG(message) NSLog(message);
@@ -38,24 +39,74 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @property (nonatomic, assign) int argc;
 @property (nonatomic, assign) char **argv;
 @property (nonatomic, assign) main_callback_t callback;
+@property (atomic, assign) atomic_int activeTasks;
+@property (atomic, assign) BOOL receivedFileHandle;
 @end
 
 @implementation AppDelegate
 
+#ifdef ENABLE_COCOA_FILE_HANDLER
+// This captures files opened via Finder / Apple Events. In order to emulate similar
+// behavior to Windows & Linux, we start a separate main function for each file with
+// the file as a parameter.
+- (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
+    self.receivedFileHandle = YES;
+    for (NSString *filename in filenames) {
+        LOG_DEBUG([NSString stringWithFormat:@"Opening file: %@", filename]);
+
+        // Launch the main method with 2 parameters (first is executable file)
+        char *exec = strdup(self.argv[0]);
+        char *path = strdup([filename UTF8String]);
+
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            char *fileArgv[] = { exec, path, NULL };
+            [self startTask];
+            self.callback(2, fileArgv);
+            [self finishTask];
+            free(exec);
+            free(path);
+        });
+    }
+
+    // Reply to the OS that the event was handled
+    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+#endif
+
+- (void)startTask {
+    atomic_fetch_add(&_activeTasks, 1);
+}
+
+- (void)finishTask {
+    int newCount = atomic_fetch_sub(&_activeTasks, 1) - 1;
+    LOG_DEBUG([NSString stringWithFormat:@"Task finished. Active tasks: %d", newCount]);
+
+    if (newCount <= 0) {
+        LOG_DEBUG(@"All tasks complete. Terminating Cocoa.");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [NSApp terminate:nil];
+        });
+    }
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification  {
+    // When users click on a file when the app is not running, the app
+    // gets launched with a file event. Users wouldn't he expect the
+    // app to be launched twice, so we ignore the main launch.
+    if (self.receivedFileHandle && self.argc <= 1) {
+        LOG_DEBUG(@"Skipping empty launch as file event was handled");
+        return;
+    }
+
     LOG_DEBUG(@"Cocoa finished launching")
 
     // Start the actual main in a background thread as the main thread is busy
     // running the Cocoa event loop
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         LOG_DEBUG(@"Handing over application logic to background thread");
+        [self startTask];
         self.callback(self.argc, self.argv);
-
-        // Close the application once the callback is done executing
-        dispatch_async(dispatch_get_main_queue(), ^{
-            LOG_DEBUG(@"Terminating Cocoa");
-            [NSApp terminate:nil];
-        });
+        [self finishTask];
     });
 
 }
