@@ -44,25 +44,30 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @implementation AppDelegate
 
 #ifdef ENABLE_COCOA_FILE_HANDLER
+
+// Unique argument that serves as a marker for internal use
+#define IGNORE_HANDLER_ARGUMENT "--launcher-ignore-openFiles"
+
 // This captures files opened via Finder / Apple Events. In order to emulate similar
 // behavior to Windows & Linux, we start a separate main function for each file with
 // the file as a parameter.
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
-    // Reply to the OS that the event was handled to prevent infinite launches
-    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+    // Guard: ignore this event if this process was launched via files event
+    if ([[[NSProcessInfo processInfo] arguments] containsObject:@(IGNORE_HANDLER_ARGUMENT)]) {
+        [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+        return;
+    }
 
-    // Absolute path to executable (more robust than argv[0])
-    NSString *executablePath = [[NSBundle mainBundle] executablePath];
-
+    // Events handler
     for (NSString *filename in filenames) {
-        LOG_DEBUG(@"Opening file: %@", filename);
 
-        // Launch in the same process if possible
+        // Try to launch in the same process if possible
         if (!self.isProcessUsed && self.argc <= 1) {
+            LOG_DEBUG(@"Using current process for file: %@", filename);
             // Modify self.args to include the new file path
             // (launch in applicationDidFinishLaunching)
             char **argv = malloc(3 * sizeof(char *));
-            argv[0] = strdup([executablePath fileSystemRepresentation]);
+            argv[0] = self.argv[0];
             argv[1] = strdup([filename fileSystemRepresentation]);
             argv[2] = NULL;
 
@@ -72,22 +77,25 @@ typedef int (*main_callback_t)(int argc, char **argv);
             continue;
         }
 
-        // Otherwise launch completely new instances. We do this in the main
-        // queue to make sure that the event success has been handled, so the
-        // other processes don't see the same event and cause infinite launches.
-        dispatch_async(dispatch_get_main_queue(), ^{
-            LOG_DEBUG(@"Launching new instance for file: %@", filename);
-            NSTask *task = [[NSTask alloc] init];
-            [task setExecutableURL:[NSURL fileURLWithPath:executablePath]];
-            [task setArguments:@[filename]];
+        // Otherwise launch completely new instances. Note that macOS may send the
+        // same open event to the new instance, so we add a special guard argument
+        // to avoid infinite launches. The guard is removed before calling main.
+        LOG_DEBUG(@"Launching new instance for file: %@", filename);
+        NSTask *task = [[NSTask alloc] init];
+        NSString *executablePath = [[NSBundle mainBundle] executablePath];
+        [task setExecutableURL:[NSURL fileURLWithPath:executablePath]];
+        [task setArguments:@[filename, @(IGNORE_HANDLER_ARGUMENT)]];
 
-            NSError *error = nil;
-            if (![task launchAndReturnError:&error]) {
-                LOG_DEBUG(@"Failed to launch task: %@", error.localizedDescription);
-            }
-        });
+        NSError *error = nil;
+        if (![task launchAndReturnError:&error]) {
+            LOG_DEBUG(@"Failed to launch task: %@", error.localizedDescription);
+        }
 
     }
+
+    // Let the system know that the event was handled. Note that there is
+    // no guarantee about when this gets acknowledged.
+    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
 
 }
 #endif
@@ -95,6 +103,13 @@ typedef int (*main_callback_t)(int argc, char **argv);
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification  {
     LOG_DEBUG(@"Cocoa finished launching")
     self.isProcessUsed = YES;
+
+#ifdef ENABLE_COCOA_FILE_HANDLER
+    // Prevent guard argument added by file open events from going into the app
+    if (self.argc > 1 && strcmp(self.argv[self.argc-1], IGNORE_HANDLER_ARGUMENT) == 0) {
+        self.argc -= 1;
+    }
+#endif
 
     // Start the actual main in a background thread as the main thread is busy
     // running the Cocoa event loop

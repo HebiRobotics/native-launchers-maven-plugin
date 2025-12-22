@@ -181,7 +181,9 @@ int main_entry_point(int argc, char** argv) {
         return 1;
     }
 
+    PRINT_DEBUG("Creating Java args[%d]",arrayLength);
     for (int i = 0; i < arrayLength; i++) {
+        PRINT_DEBUG("  args[%d]=%s",i, argv[i+1]);
         jstring str = (*env)->NewStringUTF(env, argv[i + 1]);
         if (str == NULL) {
             PRINT_ERROR("Failed to create string for argument %d", i);
