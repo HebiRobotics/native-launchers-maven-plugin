@@ -28,9 +28,9 @@
 #import <stdatomic.h>
 
 #ifdef DEBUG
-#define LOG_DEBUG(message) NSLog(message);
+#define LOG_DEBUG(message, ...) NSLog(message, ##__VA_ARGS__);
 #else
-#define LOG_DEBUG(message)
+#define LOG_DEBUG(message, ...)
 #endif
 
 typedef int (*main_callback_t)(int argc, char **argv);
