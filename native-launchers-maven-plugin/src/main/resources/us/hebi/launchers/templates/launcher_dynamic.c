@@ -136,7 +136,7 @@ int main_entry_point(int argc, char** argv) {
 
     PRINT_DEBUG("Adding vm options:");
     for (int i=0; i < nOptions; i++) {
-        PRINT_DEBUG(options[i].optionString);
+        PRINT_DEBUG("%s", options[i].optionString);
     }
 
     // Init struct

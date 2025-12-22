@@ -25,7 +25,6 @@
  */
 
 #import <Cocoa/Cocoa.h>
-#import <stdatomic.h>
 
 #ifdef DEBUG
 #define LOG_DEBUG(message, ...) NSLog(message, ##__VA_ARGS__);
@@ -39,8 +38,7 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @property (nonatomic, assign) int argc;
 @property (nonatomic, assign) char **argv;
 @property (nonatomic, assign) main_callback_t callback;
-@property (atomic, assign) atomic_int activeTasks;
-@property (atomic, assign) BOOL receivedFileHandle;
+@property (atomic, assign) BOOL isProcessUsed;
 @end
 
 @implementation AppDelegate
@@ -50,63 +48,65 @@ typedef int (*main_callback_t)(int argc, char **argv);
 // behavior to Windows & Linux, we start a separate main function for each file with
 // the file as a parameter.
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
-    self.receivedFileHandle = YES;
+    // Reply to the OS that the event was handled to prevent infinite launches
+    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+
+    // Absolute path to executable (more robust than argv[0])
+    NSString *executablePath = [[NSBundle mainBundle] executablePath];
+
     for (NSString *filename in filenames) {
-        LOG_DEBUG([NSString stringWithFormat:@"Opening file: %@", filename]);
+        LOG_DEBUG(@"Opening file: %@", filename);
 
-        // Launch the main method with 2 parameters (first is executable file)
-        char *exec = strdup(self.argv[0]);
-        char *path = strdup([filename UTF8String]);
+        // Launch in the same process if possible
+        if (!self.isProcessUsed && self.argc <= 1) {
+            // Modify self.args to include the new file path
+            // (launch in applicationDidFinishLaunching)
+            char **argv = malloc(3 * sizeof(char *));
+            argv[0] = strdup([executablePath fileSystemRepresentation]);
+            argv[1] = strdup([filename fileSystemRepresentation]);
+            argv[2] = NULL;
 
-        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            char *fileArgv[] = { exec, path, NULL };
-            [self startTask];
-            self.callback(2, fileArgv);
-            [self finishTask];
-            free(exec);
-            free(path);
+            self.argv = argv;
+            self.argc = 2;
+            self.isProcessUsed = YES;
+            continue;
+        }
+
+        // Otherwise launch completely new instances. We do this in the main
+        // queue to make sure that the event success has been handled, so the
+        // other processes don't see the same event and cause infinite launches.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            LOG_DEBUG(@"Launching new instance for file: %@", filename);
+            NSTask *task = [[NSTask alloc] init];
+            [task setExecutableURL:[NSURL fileURLWithPath:executablePath]];
+            [task setArguments:@[filename]];
+
+            NSError *error = nil;
+            if (![task launchAndReturnError:&error]) {
+                LOG_DEBUG(@"Failed to launch task: %@", error.localizedDescription);
+            }
         });
+
     }
 
-    // Reply to the OS that the event was handled
-    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
 }
 #endif
 
-- (void)startTask {
-    atomic_fetch_add(&_activeTasks, 1);
-}
-
-- (void)finishTask {
-    int newCount = atomic_fetch_sub(&_activeTasks, 1) - 1;
-    LOG_DEBUG([NSString stringWithFormat:@"Task finished. Active tasks: %d", newCount]);
-
-    if (newCount <= 0) {
-        LOG_DEBUG(@"All tasks complete. Terminating Cocoa.");
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [NSApp terminate:nil];
-        });
-    }
-}
-
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification  {
-    // When users click on a file when the app is not running, the app
-    // gets launched with a file event. Users wouldn't he expect the
-    // app to be launched twice, so we ignore the main launch.
-    if (self.receivedFileHandle && self.argc <= 1) {
-        LOG_DEBUG(@"Skipping empty launch as file event was handled");
-        return;
-    }
-
     LOG_DEBUG(@"Cocoa finished launching")
+    self.isProcessUsed = YES;
 
     // Start the actual main in a background thread as the main thread is busy
     // running the Cocoa event loop
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         LOG_DEBUG(@"Handing over application logic to background thread");
-        [self startTask];
         self.callback(self.argc, self.argv);
-        [self finishTask];
+
+        // Close the application once the callback is done executing
+        dispatch_async(dispatch_get_main_queue(), ^{
+            LOG_DEBUG(@"Terminating Cocoa");
+            [NSApp terminate:nil];
+        });
     });
 
 }
