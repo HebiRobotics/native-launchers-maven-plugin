@@ -39,7 +39,7 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @property (nonatomic, assign) int argc;
 @property (nonatomic, assign) char **argv;
 @property (nonatomic, assign) main_callback_t callback;
-@property (nonatomic, assign) int processCount; // Tracks spawned tasks + local main logic
+@property (atomic, assign) BOOL isProcessUsed;
 @end
 
 @implementation AppDelegate
@@ -92,6 +92,22 @@ instance, so we keeps launches only to the primary instance.
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
     if ([self isLeader]) {
         for (NSString *filename in filenames) {
+
+            // Try to launch in the same process if possible. We modify
+            // the input args rather than spawning a new process.
+            if (!self.isProcessUsed && self.argc <= 1) {
+                LOG_DEBUG(@"Using current process for file: %@", filename);
+                char **argv = malloc(3 * sizeof(char *));
+                argv[0] = self.argv[0];
+                argv[1] = strdup([filename fileSystemRepresentation]);
+                argv[2] = NULL;
+
+                self.argv = argv;
+                self.argc = 2;
+                self.isProcessUsed = YES;
+                continue;
+            }
+
             [self launchTaskWithArguments:@[filename]];
         }
     }
@@ -119,67 +135,32 @@ Otherwise a click would always restart with the potentially same file argument.
     [task setExecutableURL:[NSURL fileURLWithPath:executablePath]];
     [task setArguments:arguments];
 
-    // Count on the main thread to avoid race conditions. The termination
-    // runs on a background thread, so we need to bounce back to main.
-    self.processCount++;
-    task.terminationHandler = ^(NSTask *t) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.processCount--;
-            [self checkForTermination];
-        });
-    };
-
-    // Revert count immediately if the launch fails
     NSError *error = nil;
     if (![task launchAndReturnError:&error]) {
         LOG_DEBUG(@"Failed to launch task: %@", error.localizedDescription);
-        self.processCount--;
     }
 
 }
 #endif
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification  {
-    // Having launched children at this point means that the process was
-    // started from a file event that already started a separate process.
-    // Thus, we don't need to display anything and just keep the process
-    // for future file events. Change to accessory mode to hide the Dock
-    // icon while any children finish.
-    if (self.processCount > 0) {
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-        LOG_DEBUG(@"Events listening mode active; waiting for children to finish.");
-        return;
-    }
-
-    // Otherwise, this is a standard GUI launch.
-    self.processCount++;
+    LOG_DEBUG(@"Cocoa finished launching")
+    self.isProcessUsed = YES;
 
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         LOG_DEBUG(@"Starting application logic on background thread");
         self.callback(self.argc, self.argv);
 
+        // Close the application once the callback is done executing
         dispatch_async(dispatch_get_main_queue(), ^{
-            LOG_DEBUG(@"Finished application logic");
-            self.processCount--;
-            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-            [self checkForTermination];
+            LOG_DEBUG(@"Terminating Cocoa");
+            [NSApp terminate:nil];
         });
     });
 }
 
-/**
- * Ensures the process only exits when all spawned tasks and local logic
- * are complete. This keeps the leader alive to catch subsequent file events.
- */
-- (void)checkForTermination {
-    if (self.processCount <= 0) {
-        LOG_DEBUG(@"All activities complete. Terminating process.");
-        [NSApp terminate:nil];
-    }
-}
-
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {
-    return NO;
+    return NO; // it gets closed when the main callback is done
 }
 
 - (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app {
@@ -191,6 +172,8 @@ Otherwise a click would always restart with the potentially same file argument.
 void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
     LOG_DEBUG(@"Launching Cocoa framework");
     @autoreleasepool {
+
+        // The main method gets called once the framework finished launching
         AppDelegate* delegate = [[AppDelegate alloc] init];
         delegate.argc = argc;
         delegate.argv = argv;
