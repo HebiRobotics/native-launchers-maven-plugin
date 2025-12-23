@@ -26,7 +26,7 @@ and provide a better default experience for command line apps: Windows streams a
 <plugin>
     <groupId>us.hebi.launchers</groupId>
     <artifactId>native-launchers-maven-plugin</artifactId>
-    <version>0.5</version>
+    <version>0.6</version>
     <configuration>
         <outputDirectory>${graalvm.outputDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>
@@ -37,6 +37,17 @@ and provide a better default experience for command line apps: Windows streams a
                 <jvmArgs>
                     <arg>-Dcustom.property=true</arg>
                 </jvmArgs>
+                
+                <!-- Disable default console for Windows GUI apps -->
+                <!--<console>false</console>-->
+                
+                <!-- 
+                For macOS GUI apps to emulate file open events similar
+                to Windows/Linux, i.e., file events spawn a new process  
+                with the file name as the first argument.
+                -->
+                <!--<cocoa>true</cocoa>-->
+                <!--<cocoaFileHandler>true</cocoaFileHandler>-->
             </launcher>
             <launcher>
                 <name>cli-dir</name>
