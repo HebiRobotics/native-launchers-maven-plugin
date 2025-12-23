@@ -38,7 +38,7 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @property (nonatomic, assign) int argc;
 @property (nonatomic, assign) char **argv;
 @property (nonatomic, assign) main_callback_t callback;
-@property (atomic, assign) BOOL isProcessUsed;
+@property (nonatomic, assign) int processCount; // Tracks spawned NSTasks
 @end
 
 @implementation AppDelegate
@@ -50,84 +50,102 @@ typedef int (*main_callback_t)(int argc, char **argv);
 
 // This captures files opened via Finder / Apple Events. In order to emulate similar
 // behavior to Windows & Linux, we start a separate main function for each file with
-// the file as a parameter.
+// the file as a parameter. Note that macOS may send the same open event to the new
+// instance, so we add a special guard argument to avoid infinite launches.
+// The guard is removed before calling main.
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
-    // Guard: ignore this event if this process was launched via files event
-    if ([[[NSProcessInfo processInfo] arguments] containsObject:@(IGNORE_HANDLER_ARGUMENT)]) {
-        [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
-        return;
-    }
-
-    // Events handler
-    for (NSString *filename in filenames) {
-
-        // Try to launch in the same process if possible
-        if (!self.isProcessUsed && self.argc <= 1) {
-            LOG_DEBUG(@"Using current process for file: %@", filename);
-            // Modify self.args to include the new file path
-            // (launch in applicationDidFinishLaunching)
-            char **argv = malloc(3 * sizeof(char *));
-            argv[0] = self.argv[0];
-            argv[1] = strdup([filename fileSystemRepresentation]);
-            argv[2] = NULL;
-
-            self.argv = argv;
-            self.argc = 2;
-            self.isProcessUsed = YES;
-            continue;
+    if (![[[NSProcessInfo processInfo] arguments] containsObject:@(IGNORE_HANDLER_ARGUMENT)]) {
+        for (NSString *filename in filenames) {
+            [self launchTaskWithArguments:@[filename, @(IGNORE_HANDLER_ARGUMENT)]];
         }
-
-        // Otherwise launch completely new instances. Note that macOS may send the
-        // same open event to the new instance, so we add a special guard argument
-        // to avoid infinite launches. The guard is removed before calling main.
-        LOG_DEBUG(@"Launching new instance for file: %@", filename);
-        NSTask *task = [[NSTask alloc] init];
-        NSString *executablePath = [[NSBundle mainBundle] executablePath];
-        [task setExecutableURL:[NSURL fileURLWithPath:executablePath]];
-        [task setArguments:@[filename, @(IGNORE_HANDLER_ARGUMENT)]];
-
-        NSError *error = nil;
-        if (![task launchAndReturnError:&error]) {
-            LOG_DEBUG(@"Failed to launch task: %@", error.localizedDescription);
-        }
-
     }
-
-    // Let the system know that the event was handled. Note that there is
-    // no guarantee about when this gets acknowledged.
     [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+
+// Handle re-activation (e.g. double clicking app while children are running)
+// macOS typically uses a single instance per app, but if we can have multiple instances
+// due to file handling, we also need to launch separate instances of the main application.
+// Otherwise a click would always restart with the potentially same file argument.
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+    [self launchTaskWithArguments:@[@(IGNORE_HANDLER_ARGUMENT)]];
+    return YES;
+}
+
+// Make sure that the guard argument gets filtered before starting the main application
+- (void)applicationWillFinishLaunching:(NSNotification *)notification {
+    if (self.argc > 1 && strcmp(self.argv[self.argc-1], IGNORE_HANDLER_ARGUMENT) == 0) {
+        self.argc -= 1;
+    }
+}
+
+- (void)launchTaskWithArguments:(NSArray<NSString *> *)arguments {
+    LOG_DEBUG(@"Launching new instance with arguments: %@", arguments);
+
+    NSTask *task = [[NSTask alloc] init];
+    NSString *executablePath = [[NSBundle mainBundle] executablePath];
+    [task setExecutableURL:[NSURL fileURLWithPath:executablePath]];
+    [task setArguments:arguments];
+
+    // Count on the main thread to avoid race conditions. The termination
+    // runs on a background thread, so we need to bounce back to main.
+    self.processCount++;
+    task.terminationHandler = ^(NSTask *t) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.processCount--;
+            [self checkForTermination];
+        });
+    };
+
+    // Revert count immediately if the launch fails
+    NSError *error = nil;
+    if (![task launchAndReturnError:&error]) {
+        LOG_DEBUG(@"Failed to launch task: %@", error.localizedDescription);
+        self.processCount--;
+    }
 
 }
 #endif
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification  {
-    LOG_DEBUG(@"Cocoa finished launching")
-    self.isProcessUsed = YES;
-
-#ifdef ENABLE_COCOA_FILE_HANDLER
-    // Prevent guard argument added by file open events from going into the app
-    if (self.argc > 1 && strcmp(self.argv[self.argc-1], IGNORE_HANDLER_ARGUMENT) == 0) {
-        self.argc -= 1;
+    // Having launched children at this point means that the process was
+    // started from a file event that already started a separate process.
+    // Thus, we don't need to display anything and just keep the process
+    // for future file events.
+    if (self.processCount > 0) {
+        LOG_DEBUG(@"Holding on to process as an event handler")
+        return;
     }
-#endif
 
-    // Start the actual main in a background thread as the main thread is busy
-    // running the Cocoa event loop
+    // Elevate to a standard app so it appears in the Dock and App Switcher
+    LOG_DEBUG(@"Cocoa finished launching")
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    [NSApp activateIgnoringOtherApps:YES];
+
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         LOG_DEBUG(@"Handing over application logic to background thread");
+        self.processCount++;
         self.callback(self.argc, self.argv);
 
-        // Close the application once the callback is done executing
         dispatch_async(dispatch_get_main_queue(), ^{
-            LOG_DEBUG(@"Terminating Cocoa");
-            [NSApp terminate:nil];
+            // Hide from the dock again
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+            self.processCount--;
+            [self checkForTermination];
         });
     });
+}
 
+
+// Helper to centralize exit logic
+- (void)checkForTermination {
+    if (self.processCount <= 0) {
+        LOG_DEBUG(@"All tasks finished. Terminating.");
+        [NSApp terminate:nil];
+    }
 }
 
 - (BOOL) applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {
-    return NO; // it gets closed when the callback is done
+    return NO;
 }
 
 - (BOOL) applicationSupportsSecureRestorableState:(NSApplication *)app {
@@ -139,25 +157,17 @@ typedef int (*main_callback_t)(int argc, char **argv);
 void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
     LOG_DEBUG(@"Launching Cocoa framework");
     @autoreleasepool {
-
-        // The main method gets called once the framework finished launching
         AppDelegate* delegate = [[AppDelegate alloc] init];
         delegate.argc = argc;
         delegate.argv = argv;
         delegate.callback = callback;
 
-        // Standard app setup
         NSApplication *app = [NSApplication sharedApplication];
         app.delegate = delegate;
 
-        // Regular means it's a normal app that shows up in the dock and can be tabbed
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-
-        // Bring the app to the foreground
+        // Start as Accessory so parent doesn't clutter Dock while children run
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
         [NSApp activateIgnoringOtherApps:YES];
-
-        // Start the Cocoa event loop (must be on the main thread)
         [NSApp run];
     }
-
 }
