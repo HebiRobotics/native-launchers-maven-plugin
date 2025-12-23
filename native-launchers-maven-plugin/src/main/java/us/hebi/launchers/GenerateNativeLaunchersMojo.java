@@ -51,7 +51,7 @@ public class GenerateNativeLaunchersMojo extends BaseConfig {
         if (shouldSkip()) return;
 
         try {
-             // Generate JNI config, so we can call the classes from the launchers
+            // Generate JNI config, so we can call the classes from the launchers
             printDebug("Generating JNI configuration for native-image");
             Path targetDir = getGeneratedMetaInfDir();
             generateJniConfig(targetDir);
@@ -87,14 +87,13 @@ public class GenerateNativeLaunchersMojo extends BaseConfig {
             for (Launcher launcher : launchers) {
 
                 // Compile source
-                String outputName = launcher.name + (isWindows() ? ".exe" : "");
                 getLog().info("Compiling " + launcher.getCFileName());
-                Path exeFile = compileSource(compiler, sourceDir, launcher.getCFileName(), outputName, launcher.console, launcher.enableCocoa(), launcher.userModelId);
+                Path exeFile = compileSource(compiler, sourceDir, launcher);
 
                 // Move result to the desired output directory
                 Path outputDir = Paths.get(getNonNull(launcher.outputDirectory, outputDirectory));
                 Files.createDirectories(outputDir);
-                Path targetFile = outputDir.resolve(outputName);
+                Path targetFile = outputDir.resolve(launcher.getOutputName());
                 Files.move(exeFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
                 artifacts.add(targetFile.toString());
 
@@ -139,7 +138,10 @@ public class GenerateNativeLaunchersMojo extends BaseConfig {
                 .replaceAll("\\{\\{METHOD_NAME}}", entrypoint);
     }
 
-    private Path compileSource(List<String> compiler, Path srcDir, String srcFileName, String outputName, boolean console, boolean cocoa, String userModelId) throws MojoExecutionException {
+    private Path compileSource(List<String> compiler, Path srcDir, Launcher launcher) throws MojoExecutionException {
+        String srcFileName = launcher.getCFileName();
+        String outputName = launcher.getOutputName();
+
         // Compile the generated file
         List<String> processArgs = new ArrayList<>(compiler);
         processArgs.addAll(compilerArgs);
@@ -150,12 +152,11 @@ public class GenerateNativeLaunchersMojo extends BaseConfig {
             processArgs.add(outputName);
         }
         processArgs.add(srcFileName);
-//        processArgs.add("jni_dynamic.c");
 
         // Add JNI headers from JAVA_HOME
         Optional.ofNullable(System.getenv("JAVA_HOME"))
                 .map(Paths::get)
-                .map(javaHome->javaHome.resolve("include"))
+                .map(javaHome -> javaHome.resolve("include"))
                 .ifPresent(includeDir -> {
                     if (isWindows()) {
                         processArgs.add("/I" + includeDir);
@@ -170,18 +171,23 @@ public class GenerateNativeLaunchersMojo extends BaseConfig {
                     }
                 });
 
-        if (isMac() && cocoa) {
+        if (isMac() && launcher.enableCocoa()) {
             processArgs.add("AppDelegate.m");
             processArgs.add("-framework");
             processArgs.add("Cocoa");
             processArgs.add("-DCOCOA");
+            if (launcher.enableCocoaFileHandler()) {
+                processArgs.add("-DENABLE_COCOA_FILE_HANDLER");
+            }
         }
-        if (console) processArgs.add("-DCONSOLE");
+        if (launcher.console) processArgs.add("-DCONSOLE");
         if (debug) processArgs.add("-DDEBUG");
-        if (isWindows() && !Utils.isNullOrEmpty(userModelId)) {
-            processArgs.add("-DAUMID=" + userModelId);
-            processArgs.add("/link");
-            processArgs.add("shell32.lib");
+        if (isWindows()) {
+            launcher.getUserModelId().ifPresent(userModelId -> {
+                processArgs.add("-DAUMID=" + userModelId);
+                processArgs.add("/link");
+                processArgs.add("shell32.lib");
+            });
         }
         if (isUnix()) processArgs.add("-ldl");
         processArgs.addAll(linkerArgs);
@@ -190,7 +196,7 @@ public class GenerateNativeLaunchersMojo extends BaseConfig {
         runProcess(srcDir, processArgs);
 
         // Disable the console window for non-console apps
-        if (!console && isWindows()) {
+        if (!launcher.console && isWindows()) {
             // Note that we modify the executable via EditBin because compiling with
             // /Subsystem:windows requires a template with a WinMain method
             printDebug("Changing " + outputName + " to a non-console app.");
