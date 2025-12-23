@@ -25,6 +25,7 @@
  */
 
 #import <Cocoa/Cocoa.h>
+#include <sys/file.h>
 
 #ifdef DEBUG
 #define LOG_DEBUG(message, ...) NSLog(message, ##__VA_ARGS__);
@@ -38,44 +39,76 @@ typedef int (*main_callback_t)(int argc, char **argv);
 @property (nonatomic, assign) int argc;
 @property (nonatomic, assign) char **argv;
 @property (nonatomic, assign) main_callback_t callback;
-@property (nonatomic, assign) int processCount; // Tracks spawned NSTasks
+@property (nonatomic, assign) int processCount; // Tracks spawned tasks + local main logic
 @end
 
 @implementation AppDelegate
 
 #ifdef ENABLE_COCOA_FILE_HANDLER
 
-// Unique argument that serves as a marker for internal use
-#define IGNORE_HANDLER_ARGUMENT "--launcher-ignore-openFiles"
+/**
+ * Advisory lock to determine which process is currently responsible for
+ * spawning new instances. If the leader terminates, the kernel releases
+ * the lock, allowing a survivor to take over.
+ */
+- (BOOL)isLeader {
+    static int lockFd = -1;
+    if (lockFd != -1) return YES;
 
-// This captures files opened via Finder / Apple Events. In order to emulate similar
-// behavior to Windows & Linux, we start a separate main function for each file with
-// the file as a parameter. Note that macOS may send the same open event to the new
-// instance, so we add a special guard argument to avoid infinite launches.
-// The guard is removed before calling main.
+    // macOS routes events based on the bundleID, so it's a good unique identifier
+    NSString *uniqueID = [[NSBundle mainBundle] bundleIdentifier];
+
+    // generate a unique fallback based on the absolute path in case the launcher
+    // does not live inside a bundle
+    if (uniqueID == nil || uniqueID.length == 0) {
+        NSString *execPath = [[NSBundle mainBundle] executablePath];
+        uniqueID = [NSString stringWithFormat:@"path-hash-%lx", (unsigned long)[execPath hash]];
+    }
+
+    // Use the absolute path of the executable to create a unique identifier
+    NSString *lockName = [NSString stringWithFormat:@"launcher-%@.lock", uniqueID];
+    NSString *lockPath = [NSTemporaryDirectory() stringByAppendingPathComponent:lockName];
+
+    int fd = open([lockPath fileSystemRepresentation], O_CREAT | O_RDWR, 0666);
+    if (fd < 0) return NO;
+
+    // Advisory lock: kernel releases this automatically if process dies
+    if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+        lockFd = fd; // This process is now the designated launcher
+        LOG_DEBUG(@"Acquired leader lock: %@", lockPath);
+        return YES;
+    }
+
+    close(fd);
+    return NO;
+}
+
+/*
+This captures files opened via Finder / Apple Events. In order to emulate similar
+behavior to Windows & Linux, we start a separate main function for each file with
+the file as a parameter. Note that macOS may send the same open event to the new
+instance, so we keeps launches only to the primary instance.
+*/
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
-    if (![[[NSProcessInfo processInfo] arguments] containsObject:@(IGNORE_HANDLER_ARGUMENT)]) {
+    if ([self isLeader]) {
         for (NSString *filename in filenames) {
-            [self launchTaskWithArguments:@[filename, @(IGNORE_HANDLER_ARGUMENT)]];
+            [self launchTaskWithArguments:@[filename]];
         }
     }
     [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
 }
 
-// Handle re-activation (e.g. double clicking app while children are running)
-// macOS typically uses a single instance per app, but if we can have multiple instances
-// due to file handling, we also need to launch separate instances of the main application.
-// Otherwise a click would always restart with the potentially same file argument.
+/*
+Handle re-activation (e.g. double clicking app while children are running)
+macOS typically uses a single instance per app, but if we can have multiple instances
+due to file handling, we also need to launch separate instances of the main application.
+Otherwise a click would always restart with the potentially same file argument.
+*/
 - (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
-    [self launchTaskWithArguments:@[@(IGNORE_HANDLER_ARGUMENT)]];
-    return YES;
-}
-
-// Make sure that the guard argument gets filtered before starting the main application
-- (void)applicationWillFinishLaunching:(NSNotification *)notification {
-    if (self.argc > 1 && strcmp(self.argv[self.argc-1], IGNORE_HANDLER_ARGUMENT) == 0) {
-        self.argc -= 1;
+    if ([self isLeader]) {
+        [self launchTaskWithArguments:@[]];
     }
+    return YES;
 }
 
 - (void)launchTaskWithArguments:(NSArray<NSString *> *)arguments {
@@ -110,45 +143,46 @@ typedef int (*main_callback_t)(int argc, char **argv);
     // Having launched children at this point means that the process was
     // started from a file event that already started a separate process.
     // Thus, we don't need to display anything and just keep the process
-    // for future file events.
+    // for future file events. Change to accessory mode to hide the Dock
+    // icon while any children finish.
     if (self.processCount > 0) {
-        LOG_DEBUG(@"Holding on to process as an event handler")
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        LOG_DEBUG(@"Events listening mode active; waiting for children to finish.");
         return;
     }
 
-    // Elevate to a standard app so it appears in the Dock and App Switcher
-    LOG_DEBUG(@"Cocoa finished launching")
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    [NSApp activateIgnoringOtherApps:YES];
+    // Otherwise, this is a standard GUI launch.
+    self.processCount++;
 
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        LOG_DEBUG(@"Handing over application logic to background thread");
-        self.processCount++;
+        LOG_DEBUG(@"Starting application logic on background thread");
         self.callback(self.argc, self.argv);
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            // Hide from the dock again
-            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+            LOG_DEBUG(@"Finished application logic");
             self.processCount--;
+            [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
             [self checkForTermination];
         });
     });
 }
 
-
-// Helper to centralize exit logic
+/**
+ * Ensures the process only exits when all spawned tasks and local logic
+ * are complete. This keeps the leader alive to catch subsequent file events.
+ */
 - (void)checkForTermination {
     if (self.processCount <= 0) {
-        LOG_DEBUG(@"All tasks finished. Terminating.");
+        LOG_DEBUG(@"All activities complete. Terminating process.");
         [NSApp terminate:nil];
     }
 }
 
-- (BOOL) applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)app {
     return NO;
 }
 
-- (BOOL) applicationSupportsSecureRestorableState:(NSApplication *)app {
+- (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app {
     return YES;
 }
 
@@ -165,9 +199,13 @@ void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
         NSApplication *app = [NSApplication sharedApplication];
         app.delegate = delegate;
 
-        // Start as Accessory so parent doesn't clutter Dock while children run
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        // Regular means it's a normal app that shows up in the dock and can be tabbed
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+
+        // Bring the app to the foreground
         [NSApp activateIgnoringOtherApps:YES];
+
+        // Start the Cocoa event loop (must be on the main thread)
         [NSApp run];
     }
 }
