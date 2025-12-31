@@ -19,6 +19,18 @@
         <skipNativeBuild>false</skipNativeBuild>
     </properties>
 
+    <repositories>
+        <repository> <!-- default -->
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo1.maven.org/maven2</url>
+        </repository>
+        <repository> <!-- for Clique -->
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>info.picocli</groupId>
@@ -35,6 +47,11 @@
             <artifactId>picocli-codegen</artifactId>
             <version>${picocli.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.kusoroadeolu</groupId>
+            <artifactId>Clique</artifactId>
+            <version>v1.2.1</version>
         </dependency>
     </dependencies>
 
@@ -102,6 +119,10 @@
                                     <name>launcher-picocli</name>
                                     <mainClass>us.hebi.samples.cli.HelloPicocli</mainClass>
                                     <userModelId>hebi.launchers.HelloPicocli</userModelId>
+                                </launcher>
+                                <launcher>
+                                    <name>launcher-clique</name>
+                                    <mainClass>us.hebi.samples.cli.HelloClique</mainClass>
                                 </launcher>
                             </launchers>
                         </configuration>
