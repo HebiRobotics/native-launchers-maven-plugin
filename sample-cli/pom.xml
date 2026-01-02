@@ -51,7 +51,7 @@
         <dependency>
             <groupId>com.github.kusoroadeolu</groupId>
             <artifactId>Clique</artifactId>
-            <version>v1.2.1</version>
+            <version>v1.2.2</version>
         </dependency>
     </dependencies>
 

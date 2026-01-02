@@ -9,6 +9,7 @@ import com.github.kusoroadeolu.clique.config.*;
 import com.github.kusoroadeolu.clique.core.utils.AnsiDetector;
 import com.github.kusoroadeolu.clique.indent.Flag;
 import com.github.kusoroadeolu.clique.indent.Indenter;
+import com.github.kusoroadeolu.clique.parser.AnsiStringParser;
 import com.github.kusoroadeolu.clique.tables.TableType;
 import picocli.CommandLine;
 
@@ -118,7 +119,13 @@ public class HelloClique implements Runnable {
     }
 
     void printFileTree() {
+        // custom parser for adding closing tags
+        AnsiStringParser parser = Clique.parser(ParserConfiguration.immutableBuilder()
+                .enableAutoCloseTags()
+                .build());
+
         IndenterConfiguration config = IndenterConfiguration.immutableBuilder()
+                .parser(parser)
                 .indentLevel(2)
                 .build();
 
@@ -140,8 +147,6 @@ public class HelloClique implements Runnable {
 
         tree.print();
 
-        // Note: the magenta color opens never get closed
-        resetColors();
     }
 
     void resetColors() {
