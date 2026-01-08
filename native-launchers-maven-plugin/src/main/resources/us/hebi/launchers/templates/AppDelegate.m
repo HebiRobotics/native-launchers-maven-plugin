@@ -114,28 +114,6 @@ instance, so we keeps launches only to the primary instance.
     [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
 }
 
-/*
-Handle re-activation (e.g. double clicking app while children are running)
-macOS typically uses a single instance per app, but given the file handling
-it would be better to launch separate instances of the main app. Unfortunately,
-clicking on the taskbar would create new instances, so we only launch new
-instances when there are no open windows.
-*/
-- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
-    if ([self isLeader]) {
-        if (flag) {
-            // Windows are visible, just activate the app
-            [sender activateIgnoringOtherApps:YES];
-            return YES;
-        } else {
-            // No visible windows, launch a new instance
-            [self launchTaskWithArguments:@[]];
-            return NO; // We've handled it by launching
-        }
-    }
-    return YES; // let macOS handle secondary instances
-}
-
 - (void)launchTaskWithArguments:(NSArray<NSString *> *)arguments {
     LOG_DEBUG(@"Launching new instance with arguments: %@", arguments);
 
