@@ -169,6 +169,13 @@ void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
         NSApplication *app = [NSApplication sharedApplication];
         app.delegate = delegate;
 
+        // Install a hidden Window menu. This allows the dock icon
+        // menu to show the list of open windows (NSWindow instances)
+        // (see OpenJFX::GlassApplication.m)
+        NSMenu *myMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+        [app setWindowsMenu:myMenu];
+        [myMenu release];
+
         // Regular means it's a normal app that shows up in the dock and can be tabbed
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
