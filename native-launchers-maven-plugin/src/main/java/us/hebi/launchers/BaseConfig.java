@@ -20,7 +20,6 @@
 
 package us.hebi.launchers;
 
-import org.apache.maven.execution.BuildSuccess;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
@@ -114,11 +113,19 @@ abstract class BaseConfig extends AbstractMojo {
         @Parameter
         protected String userModelId;
 
-        @Parameter
+        /**
+         * Shows a console window on Windows
+         */
+        @Parameter(property = "console", defaultValue = "true")
         protected boolean console = true;
 
-        @Parameter
-        protected Boolean cocoa;
+        /**
+         * Creates a cocoa launcher that starts Cocoa and handles the application in a background thread.
+         * Since changing to JNI launchers, JavaFX apps can run without it, but it's still useful for
+         * file event handling to avoid private APIs. Note that this makes JavaFX run in 'embedded' mode.
+         */
+        @Parameter(property = "cocoa", defaultValue = "false")
+        protected boolean cocoa = false;
 
         /**
          * Enables capturing macOS Apple Events (e.g., "Open With" or dropping files on the dock).
@@ -132,7 +139,7 @@ abstract class BaseConfig extends AbstractMojo {
         protected List<String> jvmArgs = Collections.emptyList();
 
         public boolean enableCocoa() {
-            return (cocoa != null && cocoa) || !console;
+            return cocoa;
         }
 
         public boolean enableCocoaFileHandler() {
