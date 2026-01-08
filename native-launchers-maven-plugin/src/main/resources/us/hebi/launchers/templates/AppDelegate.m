@@ -114,19 +114,6 @@ instance, so we keeps launches only to the primary instance.
     [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
 }
 
-/*
-Handle re-activation (e.g. double clicking app while children are running)
-macOS typically uses a single instance per app, but if we can have multiple instances
-due to file handling, we also need to launch separate instances of the main application.
-Otherwise a click would always restart with the potentially same file argument.
-*/
-- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
-    if ([self isLeader]) {
-        [self launchTaskWithArguments:@[]];
-    }
-    return YES;
-}
-
 - (void)launchTaskWithArguments:(NSArray<NSString *> *)arguments {
     LOG_DEBUG(@"Launching new instance with arguments: %@", arguments);
 
@@ -181,6 +168,13 @@ void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
 
         NSApplication *app = [NSApplication sharedApplication];
         app.delegate = delegate;
+
+        // Install a hidden Window menu. This allows the dock icon
+        // menu to show the list of open windows (NSWindow instances)
+        // (see OpenJFX::GlassApplication.m)
+        NSMenu *myMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+        [app setWindowsMenu:myMenu];
+        [myMenu release];
 
         // Regular means it's a normal app that shows up in the dock and can be tabbed
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
