@@ -26,7 +26,7 @@ and provide a better default experience for command line apps: Windows streams a
 <plugin>
     <groupId>us.hebi.launchers</groupId>
     <artifactId>native-launchers-maven-plugin</artifactId>
-    <version>0.6</version>
+    <version>0.7</version>
     <configuration>
         <outputDirectory>${graalvm.outputDir}</outputDirectory>
         <imageName>${graalvm.imageName}</imageName>
