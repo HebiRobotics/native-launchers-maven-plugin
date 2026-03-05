@@ -134,6 +134,9 @@ instance, so we keeps launches only to the primary instance.
     LOG_DEBUG(@"Cocoa finished launching")
     self.isProcessUsed = YES;
 
+    // Bring the app to the foreground (again, in case the previous call was too early)
+    [NSApp activateIgnoringOtherApps:YES];
+
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         LOG_DEBUG(@"Starting application logic on background thread");
         self.callback(self.argc, self.argv);
@@ -180,7 +183,10 @@ void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
         // Bring the app to the foreground
-        [NSApp activateIgnoringOtherApps:YES];
+        // Some macOS versions require this to be on the next run-loop cycle
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [NSApp activateIgnoringOtherApps:YES];
+        });
 
         // Start the Cocoa event loop (must be on the main thread)
         [NSApp run];
