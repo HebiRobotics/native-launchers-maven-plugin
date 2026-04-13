@@ -90,6 +90,17 @@ the file as a parameter. Note that macOS may send the same open event to the new
 instance, so we keeps launches only to the primary instance.
 */
 - (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
+    // (A) If a process is not yet open, macOS launches a new one without arguments and triggers
+    // the event handler before the application fully starts. Thus, we can want to hijack the new
+    // process and inject the event location.
+    // (B) However, if an app gets started from a FileOpenDialog, the newly launched process
+    // also receives an unwanted openFiles event immediately. In this case we want to avoid opening
+    // multiple copies, so we ignore early events on processes with arguments (e.g. the file name).
+    if (!self.isProcessUsed && self.argc > 1) {
+        LOG_DEBUG(@"Ignored openFiles event before application launch");
+        return;
+    }
+
     if ([self isLeader]) {
         for (NSString *filename in filenames) {
 
@@ -187,13 +198,6 @@ void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [NSApp activateIgnoringOtherApps:YES];
         });
-
-#ifdef ENABLE_COCOA_FILE_HANDLER
-        // Add the leadership check early to avoid a race condition where
-        // leadership has not been established and a new process immediately
-        // launchers another
-        [delegate isLeader];
-#endif
 
         // Start the Cocoa event loop (must be on the main thread)
         [NSApp run];
