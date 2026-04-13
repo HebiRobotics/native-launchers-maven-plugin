@@ -188,6 +188,13 @@ void launchCocoaApp(int argc, char** argv, main_callback_t callback) {
             [NSApp activateIgnoringOtherApps:YES];
         });
 
+#ifdef ENABLE_COCOA_FILE_HANDLER
+        // Add the leadership check early to avoid a race condition where
+        // leadership has not been established and a new process immediately
+        // launchers another
+        [delegate isLeader];
+#endif
+
         // Start the Cocoa event loop (must be on the main thread)
         [NSApp run];
     }
